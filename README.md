@@ -1,36 +1,184 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Kelapa - Coconut Factory Management System
+
+A comprehensive system for managing coconut factory operations including raw material processing, production tracking, employee attendance, and automated payroll.
+
+## Features
+
+- **RMP Module**: Manage raw material intake and sorting operations
+- **MP Module**: Track production activities (manual, machine, shaler)
+- **HR Module**: Handle employee management, attendance, and payroll
+- **Manager Dashboard**: Monitor operations and generate reports
+- **Role-Based Access Control**: Different access levels for employees, HR, and managers
+- **Automated Payroll**: Calculate salaries based on attendance and production
+- **Comprehensive Reporting**: Detailed reports for all operations
+- **Variance Control**: Track differences between intake and production
+
+## Tech Stack
+
+- **Frontend**: Next.js 16.1.1 with App Router
+- **Styling**: Tailwind CSS
+- **Database**: PostgreSQL with Drizzle ORM
+- **Authentication**: JWT-based authentication
+- **UI Components**: shadcn/ui (using Radix UI and Lucide React)
+
+## Architecture
+
+The application follows a modular architecture with the following components:
+
+- **Database Layer**: Drizzle ORM with PostgreSQL
+- **Service Layer**: Business logic in `/lib` directory
+- **API Layer**: Next.js API routes in `/app/api`
+- **Presentation Layer**: React components in `/app` and `/components`
+
+## Modules
+
+### RMP (Raw Material Processing)
+- Manage distributor information
+- Record coconut intake with quality grades
+- Track sorting operations
+
+### MP (Manufacturing Process)
+- Record production activities (manual, machine, shaler)
+- Track employee productivity
+- Estimate salary based on production output
+
+### HR (Human Resources)
+- Employee management
+- Attendance tracking
+- Automated payroll processing
+- Pay period management
+
+### Reporting
+- RMP reports (intake, sorting, distributor analysis)
+- MP reports (production by type, employee, date)
+- Attendance reports
+- Payroll reports
+- Summary reports
+- Variance reports (intake vs production)
 
 ## Getting Started
 
-First, run the development server:
-
+1. Install dependencies:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Set up environment variables:
+```bash
+cp .env.example .env.local
+# Update DATABASE_URL and JWT_SECRET in .env.local
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Generate database schema:
+```bash
+npm run db:generate
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Run database migrations:
+```bash
+npm run db:migrate
+```
 
-## Learn More
+5. Seed the database with sample data:
+```bash
+npm run db:seed
+```
 
-To learn more about Next.js, take a look at the following resources:
+6. Start the development server:
+```bash
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The application will be available at http://localhost:3000
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Environment Variables
 
-## Deploy on Vercel
+- `DATABASE_URL`: PostgreSQL connection string
+- `JWT_SECRET`: Secret key for JWT token generation
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## API Endpoints
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Authentication
+- `POST /api/auth/login` - User login
+- `POST /api/auth/register` - User registration
+- `POST /api/auth/logout` - User logout
+
+### RMP Module
+- `GET /api/rmp/distributors` - Get all distributors
+- `POST /api/rmp/distributors` - Create distributor
+- `GET /api/rmp/distributors/[id]` - Get distributor by ID
+- `PUT /api/rmp/distributors/[id]` - Update distributor
+- `DELETE /api/rmp/distributors/[id]` - Delete distributor
+- `GET /api/rmp/coconut-intakes` - Get coconut intakes
+- `POST /api/rmp/coconut-intakes` - Create coconut intake
+- `GET /api/rmp/sorting-records` - Get sorting records
+- `POST /api/rmp/sorting-records` - Create sorting record
+
+### MP Module
+- `GET /api/mp/productions` - Get productions
+- `POST /api/mp/productions` - Create production
+- `GET /api/mp/job-rates` - Get job rates
+
+### HR Module
+- `GET /api/hr/employees` - Get employees
+- `POST /api/hr/employees` - Create employee
+- `GET /api/hr/attendances` - Get attendances
+- `POST /api/hr/attendances` - Create attendance
+- `GET /api/hr/pay-periods` - Get pay periods
+- `POST /api/hr/pay-periods` - Create pay period
+- `POST /api/hr/payroll/process` - Process payroll
+- `POST /api/hr/payroll/finalize` - Finalize payroll
+
+### Reporting
+- `GET /api/reports/rmp` - RMP reports
+- `GET /api/reports/mp` - MP reports
+- `GET /api/reports/attendance` - Attendance reports
+- `GET /api/reports/payroll` - Payroll reports
+- `GET /api/reports/summary` - Summary reports
+- `GET /api/reports/variance` - Variance reports
+
+## Roles and Permissions
+
+- **pegawai_rmp**: Access to RMP module only
+- **pegawai_mp**: Access to MP module only
+- **staff_hr**: Access to HR module and some reports
+- **manajer**: Read-only access to all reports
+
+## Database Schema
+
+The application uses the following main tables:
+
+- `users`: User accounts and authentication
+- `distributors`: Supplier information
+- `coconut_intakes`: Raw material intake records
+- `sorting_records`: Sorting operation records
+- `employees`: Employee information
+- `job_rates`: Production rate information
+- `attendances`: Employee attendance records
+- `productions`: Production activity records
+- `pay_periods`: Payroll period definitions
+- `payroll_records`: Calculated payroll records
+- `reports`: Generated reports
+
+## Security
+
+- JWT-based authentication with secure cookies
+- Role-based access control for all operations
+- Input validation and sanitization
+- Secure password hashing with bcrypt
+
+## Testing
+
+Run the application test:
+```bash
+tsx test/application-test.ts
+```
+
+## Deployment
+
+For production deployment, ensure you have:
+
+1. Proper environment variables set
+2. PostgreSQL database configured
+3. SSL certificates for secure connections
+4. Proper session management for production
