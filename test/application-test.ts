@@ -1,13 +1,11 @@
 // Simple test to verify the application structure
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
 
 async function testDatabaseConnection() {
   try {
     // Test database connection by querying the users table
-    const userCount = await db.select({ count: users.id }).from(users);
-    console.log(`Database connection successful. Found ${userCount.length} users.`);
+    const userCount = await db.user.count();
+    console.log(`Database connection successful. Found ${userCount} users.`);
     return true;
   } catch (error) {
     console.error('Database connection failed:', error);

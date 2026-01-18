@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { requireAuth } from '@/lib/auth/middleware';
+import { requireAuthServer } from '@/lib/auth/server-utils';
 import { ProductionType } from '@prisma/client';
 
 export interface ProductionInput {
@@ -20,7 +20,7 @@ export async function getAllProductions(filters?: {
   employeeId?: number;
   productionType?: string;
 }) {
-  await requireAuth(['pegawai_mp', 'staff_hr', 'manajer']);
+  await requireAuthServer(['pegawai_mp', 'staff_hr', 'manajer']);
 
   const where: any = {};
   if (filters) {
@@ -50,7 +50,7 @@ export async function getAllProductions(filters?: {
 }
 
 export async function getProductionById(id: number) {
-  await requireAuth(['pegawai_mp', 'staff_hr', 'manajer']);
+  await requireAuthServer(['pegawai_mp', 'staff_hr', 'manajer']);
 
   return await db.production.findUnique({
     where: { id },
@@ -63,7 +63,7 @@ export async function getProductionById(id: number) {
 }
 
 export async function createProduction(data: ProductionInput) {
-  const user = await requireAuth(['pegawai_mp']);
+  const user = await requireAuthServer(['pegawai_mp']);
 
   return await db.production.create({
     data: {
@@ -78,7 +78,7 @@ export async function createProduction(data: ProductionInput) {
 }
 
 export async function updateProduction(id: number, data: Partial<ProductionInput>) {
-  await requireAuth(['pegawai_mp']);
+  await requireAuthServer(['pegawai_mp']);
 
   return await db.production.update({
     where: { id },
@@ -92,7 +92,7 @@ export async function updateProduction(id: number, data: Partial<ProductionInput
 }
 
 export async function deleteProduction(id: number) {
-  await requireAuth(['pegawai_mp']);
+  await requireAuthServer(['pegawai_mp']);
 
   return await db.production.delete({
     where: { id },
@@ -101,7 +101,7 @@ export async function deleteProduction(id: number) {
 
 // Job Rates Services
 export async function getAllJobRates() {
-  await requireAuth(['pegawai_mp', 'staff_hr', 'manajer']);
+  await requireAuthServer(['pegawai_mp', 'staff_hr', 'manajer']);
 
   return await db.jobRate.findMany({
     where: { isActive: true },
@@ -110,7 +110,7 @@ export async function getAllJobRates() {
 }
 
 export async function getJobRateById(id: number) {
-  await requireAuth(['pegawai_mp', 'staff_hr', 'manajer']);
+  await requireAuthServer(['pegawai_mp', 'staff_hr', 'manajer']);
 
   return await db.jobRate.findUnique({
     where: { id, isActive: true },
@@ -119,7 +119,7 @@ export async function getJobRateById(id: number) {
 
 // Employee Production Summary
 export async function getEmployeeProductionSummary(employeeId: number, startDate: string, endDate: string) {
-  await requireAuth(['pegawai_mp', 'staff_hr', 'manajer']);
+  await requireAuthServer(['pegawai_mp', 'staff_hr', 'manajer']);
 
   const results = await db.production.groupBy({
     by: ['productionType'],
@@ -145,9 +145,9 @@ export async function getEmployeeProductionSummary(employeeId: number, startDate
 
 // Estimate Salary Based on Production
 export async function estimateSalaryFromProduction(employeeId: number, startDate: string, endDate: string) {
-  await requireAuth(['pegawai_mp']); // Only allow employee to view their own
+  await requireAuthServer(['pegawai_mp']); // Only allow employee to view their own
 
-  const currentUser = await requireAuth();
+  const currentUser = await requireAuthServer();
   const employee = await db.employee.findUnique({
     where: { id: employeeId },
   });

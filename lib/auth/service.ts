@@ -1,8 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { UserRole } from '@prisma/client';
 import {
   verifyPassword,
   generateToken,
@@ -27,7 +26,7 @@ export interface RegisterData {
 export async function loginUser(credentials: LoginCredentials): Promise<{ success: boolean; message: string; user?: JWTPayload }> {
   try {
     // Find user by email
-    const [user] = await db.select().from(users).where(eq(users.email, credentials.email));
+    const user = await db.user.findUnique({ where: { email: credentials.email } });
     
     if (!user) {
       return { success: false, message: 'Invalid email or password' };
@@ -70,9 +69,9 @@ export async function loginUser(credentials: LoginCredentials): Promise<{ succes
 export async function registerUser(userData: RegisterData): Promise<{ success: boolean; message: string }> {
   try {
     // Check if user already exists
-    const existingUsers = await db.select().from(users).where(eq(users.email, userData.email));
+    const existingUser = await db.user.findUnique({ where: { email: userData.email } });
     
-    if (existingUsers.length > 0) {
+    if (existingUser) {
       return { success: false, message: 'Email already registered' };
     }
 
@@ -80,11 +79,13 @@ export async function registerUser(userData: RegisterData): Promise<{ success: b
     const hashedPassword = await hashPassword(userData.password);
 
     // Insert new user
-    await db.insert(users).values({
-      name: userData.name,
-      email: userData.email,
-      password: hashedPassword,
-      role: userData.role,
+    await db.user.create({
+      data: {
+        name: userData.name,
+        email: userData.email,
+        password: hashedPassword,
+        role: userData.role as unknown as UserRole,
+      }
     });
 
     return { success: true, message: 'User registered successfully' };

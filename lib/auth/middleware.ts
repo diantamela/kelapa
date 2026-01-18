@@ -10,8 +10,8 @@ export async function getCurrentUser(): Promise<JWTPayload | null> {
     let token: string | undefined;
 
     try {
-      const cookieStore = cookies();
-      const cookie = cookieStore.get('token');
+      const cookieStore = await cookies();
+      const cookie = await cookieStore.get('token');
       token = cookie?.value;
     } catch (cookieError) {
       console.warn('Could not access cookies:', cookieError);

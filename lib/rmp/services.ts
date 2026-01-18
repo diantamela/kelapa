@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { requireAuth } from '@/lib/auth/middleware';
+import { requireAuthServer } from '@/lib/auth/server-utils';
 import { QualityGrade } from '@prisma/client';
 
 export interface DistributorInput {
@@ -29,7 +29,7 @@ export interface SortingRecordInput {
 
 // Distributor Services
 export async function getAllDistributors() {
-  await requireAuth(['pegawai_rmp', 'staff_hr', 'manajer']);
+  await requireAuthServer(['pegawai_rmp', 'staff_hr', 'manajer']);
 
   return await db.distributor.findMany({
     where: { isActive: true },
@@ -38,7 +38,7 @@ export async function getAllDistributors() {
 }
 
 export async function getDistributorById(id: number) {
-  await requireAuth(['pegawai_rmp', 'staff_hr', 'manajer']);
+  await requireAuthServer(['pegawai_rmp', 'staff_hr', 'manajer']);
 
   return await db.distributor.findUnique({
     where: { id, isActive: true },
@@ -46,7 +46,7 @@ export async function getDistributorById(id: number) {
 }
 
 export async function createDistributor(data: DistributorInput) {
-  const user = await requireAuth(['pegawai_rmp', 'staff_hr']);
+  const user = await requireAuthServer(['pegawai_rmp', 'staff_hr']);
 
   return await db.distributor.create({
     data: {
@@ -57,7 +57,7 @@ export async function createDistributor(data: DistributorInput) {
 }
 
 export async function updateDistributor(id: number, data: Partial<DistributorInput>) {
-  await requireAuth(['pegawai_rmp', 'staff_hr']);
+  await requireAuthServer(['pegawai_rmp', 'staff_hr']);
 
   return await db.distributor.update({
     where: { id },
@@ -69,7 +69,7 @@ export async function updateDistributor(id: number, data: Partial<DistributorInp
 }
 
 export async function deleteDistributor(id: number) {
-  await requireAuth(['pegawai_rmp', 'staff_hr']);
+  await requireAuthServer(['pegawai_rmp', 'staff_hr']);
 
   return await db.distributor.update({
     where: { id },
@@ -79,7 +79,7 @@ export async function deleteDistributor(id: number) {
 
 // Coconut Intake Services
 export async function getAllCoconutIntakes(filters?: { startDate?: string; endDate?: string; distributorId?: number }) {
-  await requireAuth(['pegawai_rmp', 'staff_hr', 'manajer']);
+  await requireAuthServer(['pegawai_rmp', 'staff_hr', 'manajer']);
 
   const where: any = {};
   if (filters) {
@@ -106,7 +106,7 @@ export async function getAllCoconutIntakes(filters?: { startDate?: string; endDa
 }
 
 export async function getCoconutIntakeById(id: number) {
-  await requireAuth(['pegawai_rmp', 'staff_hr', 'manajer']);
+  await requireAuthServer(['pegawai_rmp', 'staff_hr', 'manajer']);
 
   return await db.coconutIntake.findUnique({
     where: { id },
@@ -119,7 +119,7 @@ export async function getCoconutIntakeById(id: number) {
 }
 
 export async function createCoconutIntake(data: CoconutIntakeInput) {
-  const user = await requireAuth(['pegawai_rmp']);
+  const user = await requireAuthServer(['pegawai_rmp']);
 
   return await db.coconutIntake.create({
     data: {
@@ -134,7 +134,7 @@ export async function createCoconutIntake(data: CoconutIntakeInput) {
 
 // Sorting Record Services
 export async function getAllSortingRecords(filters?: { startDate?: string; endDate?: string; intakeId?: number }) {
-  await requireAuth(['pegawai_rmp', 'staff_hr', 'manajer']);
+  await requireAuthServer(['pegawai_rmp', 'staff_hr', 'manajer']);
 
   const where: any = {};
   if (filters) {
@@ -166,7 +166,7 @@ export async function getAllSortingRecords(filters?: { startDate?: string; endDa
 }
 
 export async function getSortingRecordById(id: number) {
-  await requireAuth(['pegawai_rmp', 'staff_hr', 'manajer']);
+  await requireAuthServer(['pegawai_rmp', 'staff_hr', 'manajer']);
 
   return await db.sortingRecord.findUnique({
     where: { id },
@@ -184,7 +184,7 @@ export async function getSortingRecordById(id: number) {
 }
 
 export async function createSortingRecord(data: SortingRecordInput) {
-  const user = await requireAuth(['pegawai_rmp']);
+  const user = await requireAuthServer(['pegawai_rmp']);
 
   return await db.sortingRecord.create({
     data: {

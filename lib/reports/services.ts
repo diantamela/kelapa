@@ -1,406 +1,330 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { 
-  coconutIntakes,
-  sortingRecords,
-  productions,
-  attendances,
-  payrollRecords,
-  payPeriods,
-  distributors,
-  employees
-} from '@/lib/db/schema';
-import { eq, and, gte, lte, desc, sql, count, avg, sum } from 'drizzle-orm';
-import { requireAuth } from '@/lib/auth/middleware';
+import { requireAuthServer } from '@/lib/auth/server-utils';
 
 // RMP Reports
 export async function getRMPReport(startDate: string, endDate: string) {
-  await requireAuth(['manajer']);
+  await requireAuthServer(['manajer']);
   
   // Total coconut intake by date
-  const intakeSummary = await db
-    .select({
-      date: coconutIntakes.intakeDate,
-      totalWeight: sql<number>`SUM(${coconutIntakes.weight})::numeric`,
-      count: count(coconutIntakes.id).mapWith(Number),
-    })
-    .from(coconutIntakes)
-    .where(
-      and(
-        gte(coconutIntakes.intakeDate, startDate),
-        lte(coconutIntakes.intakeDate, endDate)
-      )
-    )
-    .groupBy(coconutIntakes.intakeDate)
-    .orderBy(desc(coconutIntakes.intakeDate));
+  const intakeSummaryRaw = await db.coconutIntake.groupBy({
+    by: ['intakeDate'],
+    where: {
+      intakeDate: { gte: new Date(startDate), lte: new Date(endDate) }
+    },
+    _sum: { weight: true },
+    _count: { _all: true },
+    orderBy: { intakeDate: 'desc' },
+  });
+  const intakeSummary = intakeSummaryRaw.map(r => ({
+    date: r.intakeDate,
+    totalWeight: Number(r._sum.weight ?? 0),
+    count: r._count._all,
+  }));
   
   // Intake by distributor
-  const intakeByDistributor = await db
-    .select({
-      distributorName: distributors.name,
-      totalWeight: sql<number>`SUM(${coconutIntakes.weight})::numeric`,
-      count: count(coconutIntakes.id).mapWith(Number),
-    })
-    .from(coconutIntakes)
-    .leftJoin(distributors, eq(coconutIntakes.distributorId, distributors.id))
-    .where(
-      and(
-        gte(coconutIntakes.intakeDate, startDate),
-        lte(coconutIntakes.intakeDate, endDate)
-      )
-    )
-    .groupBy(distributors.name)
-    .orderBy(desc(sql<number>`SUM(${coconutIntakes.weight})::numeric`));
-  
+  const intakeByDistributorAgg = await db.coconutIntake.groupBy({
+    by: ['distributorId'],
+    where: {
+      intakeDate: { gte: new Date(startDate), lte: new Date(endDate) }
+    },
+    _sum: { weight: true },
+    _count: { _all: true },
+    orderBy: { _sum: { weight: 'desc' } },
+  });
+  const distributorIds = intakeByDistributorAgg.map(i => i.distributorId).filter((v): v is number => v != null);
+  const distributors = distributorIds.length
+    ? await db.distributor.findMany({ where: { id: { in: distributorIds } }, select: { id: true, name: true } })
+    : [];
+  const distributorNameMap = new Map(distributors.map(d => [d.id, d.name] as const));
+  const intakeByDistributor = intakeByDistributorAgg.map(r => ({
+    distributorName: r.distributorId ? (distributorNameMap.get(r.distributorId) ?? 'Unknown') : 'Unknown',
+    totalWeight: Number(r._sum.weight ?? 0),
+    count: r._count._all,
+  }));
+
   // Sorting summary
-  const sortingSummary = await db
-    .select({
-      sortedDate: sortingRecords.sortedDate,
-      totalGoodCoconuts: sql<number>`SUM(${sortingRecords.goodCoconuts})::numeric`,
-      totalBadCoconuts: sql<number>`SUM(${sortingRecords.badCoconuts})::numeric`,
-    })
-    .from(sortingRecords)
-    .where(
-      and(
-        gte(sortingRecords.sortedDate, startDate),
-        lte(sortingRecords.sortedDate, endDate)
-      )
-    )
-    .groupBy(sortingRecords.sortedDate)
-    .orderBy(desc(sortingRecords.sortedDate));
+  const sortingSummaryRaw = await db.sortingRecord.groupBy({
+    by: ['sortedDate'],
+    where: {
+      sortedDate: { gte: new Date(startDate), lte: new Date(endDate) }
+    },
+    _sum: { goodCoconuts: true, badCoconuts: true },
+    orderBy: { sortedDate: 'desc' },
+  });
+  const sortingSummary = sortingSummaryRaw.map(r => ({
+    sortedDate: r.sortedDate,
+    totalGoodCoconuts: Number(r._sum.goodCoconuts ?? 0),
+    totalBadCoconuts: Number(r._sum.badCoconuts ?? 0),
+  }));
   
-  return {
-    intakeSummary,
-    intakeByDistributor,
-    sortingSummary,
-  };
+  return { intakeSummary, intakeByDistributor, sortingSummary };
 }
 
 // MP Reports
 export async function getMPReport(startDate: string, endDate: string) {
-  await requireAuth(['manajer']);
+  await requireAuthServer(['manajer']);
   
   // Production by type
-  const productionByType = await db
-    .select({
-      productionType: productions.productionType,
-      totalQuantity: sql<number>`SUM(${productions.quantity})::numeric`,
-      count: count(productions.id).mapWith(Number),
-    })
-    .from(productions)
-    .where(
-      and(
-        gte(productions.productionDate, startDate),
-        lte(productions.productionDate, endDate)
-      )
-    )
-    .groupBy(productions.productionType)
-    .orderBy(desc(sql<number>`SUM(${productions.quantity})::numeric`));
+  const productionByTypeRaw = await db.production.groupBy({
+    by: ['productionType'],
+    where: {
+      productionDate: { gte: new Date(startDate), lte: new Date(endDate) }
+    },
+    _sum: { quantity: true },
+    _count: { _all: true },
+    orderBy: { _sum: { quantity: 'desc' } },
+  });
+  const productionByType = productionByTypeRaw.map(r => ({
+    productionType: r.productionType,
+    totalQuantity: Number(r._sum.quantity ?? 0),
+    count: r._count._all,
+  }));
   
   // Production by employee
-  const productionByEmployee = await db
-    .select({
-      employeeName: sql<string>`CONCAT(${employees.firstName}, ' ', ${employees.lastName})`,
-      employeeCode: employees.employeeCode,
-      totalQuantity: sql<number>`SUM(${productions.quantity})::numeric`,
-      count: count(productions.id).mapWith(Number),
-    })
-    .from(productions)
-    .leftJoin(employees, eq(productions.employeeId, employees.id))
-    .where(
-      and(
-        gte(productions.productionDate, startDate),
-        lte(productions.productionDate, endDate)
-      )
-    )
-    .groupBy(employees.firstName, employees.lastName, employees.employeeCode)
-    .orderBy(desc(sql<number>`SUM(${productions.quantity})::numeric`));
-  
+  const productionByEmployeeAgg = await db.production.groupBy({
+    by: ['employeeId'],
+    where: {
+      productionDate: { gte: new Date(startDate), lte: new Date(endDate) }
+    },
+    _sum: { quantity: true },
+    _count: { _all: true },
+    orderBy: { _sum: { quantity: 'desc' } },
+  });
+  const employeeIds = productionByEmployeeAgg.map(p => p.employeeId).filter((v): v is number => v != null);
+  const employees = employeeIds.length
+    ? await db.employee.findMany({ where: { id: { in: employeeIds } }, select: { id: true, firstName: true, lastName: true, employeeCode: true } })
+    : [];
+  const empMap = new Map(employees.map(e => [e.id, e] as const));
+  const productionByEmployee = productionByEmployeeAgg.map(r => ({
+    employeeName: r.employeeId ? `${empMap.get(r.employeeId)?.firstName ?? ''} ${empMap.get(r.employeeId)?.lastName ?? ''}`.trim() : 'Unknown',
+    employeeCode: r.employeeId ? (empMap.get(r.employeeId)?.employeeCode ?? 'Unknown') : 'Unknown',
+    totalQuantity: Number(r._sum.quantity ?? 0),
+    count: r._count._all,
+  }));
+
   // Production trend by date
-  const productionTrend = await db
-    .select({
-      date: productions.productionDate,
-      totalQuantity: sql<number>`SUM(${productions.quantity})::numeric`,
-      count: count(productions.id).mapWith(Number),
-    })
-    .from(productions)
-    .where(
-      and(
-        gte(productions.productionDate, startDate),
-        lte(productions.productionDate, endDate)
-      )
-    )
-    .groupBy(productions.productionDate)
-    .orderBy(productions.productionDate);
+  const productionTrendRaw = await db.production.groupBy({
+    by: ['productionDate'],
+    where: {
+      productionDate: { gte: new Date(startDate), lte: new Date(endDate) }
+    },
+    _sum: { quantity: true },
+    _count: { _all: true },
+    orderBy: { productionDate: 'asc' },
+  });
+  const productionTrend = productionTrendRaw.map(r => ({
+    date: r.productionDate,
+    totalQuantity: Number(r._sum.quantity ?? 0),
+    count: r._count._all,
+  }));
   
-  return {
-    productionByType,
-    productionByEmployee,
-    productionTrend,
-  };
+  return { productionByType, productionByEmployee, productionTrend };
 }
 
 // Attendance Reports
 export async function getAttendanceReport(startDate: string, endDate: string) {
-  await requireAuth(['manajer']);
+  await requireAuthServer(['manajer']);
   
   // Attendance summary by date
-  const attendanceSummary = await db
-    .select({
-      date: attendances.date,
-      presentCount: count(attendances.id).filter(eq(attendances.status, 'present')).mapWith(Number),
-      absentCount: count(attendances.id).filter(eq(attendances.status, 'absent')).mapWith(Number),
-      lateCount: count(attendances.id).filter(eq(attendances.status, 'late')).mapWith(Number),
-      totalEmployees: count(attendances.id).mapWith(Number),
-    })
-    .from(attendances)
-    .where(
-      and(
-        gte(attendances.date, startDate),
-        lte(attendances.date, endDate)
-      )
-    )
-    .groupBy(attendances.date)
-    .orderBy(attendances.date);
+  const attendanceSummaryAgg = await db.attendance.groupBy({
+    by: ['date'],
+    where: { date: { gte: new Date(startDate), lte: new Date(endDate) } },
+    _count: {
+      _all: true,
+    },
+    orderBy: { date: 'asc' },
+  });
+  // Counts per status per day need separate queries or $queryRaw; do minimal approach:
+  const statuses: Array<'present' | 'absent' | 'late'> = ['present', 'absent', 'late'];
+  const perDayStatusCounts = new Map<string, { present: number; absent: number; late: number }>();
+  for (const day of attendanceSummaryAgg) {
+    const dayStr = day.date.toISOString().slice(0, 10);
+    const counts: any = { present: 0, absent: 0, late: 0 };
+    for (const s of statuses) {
+      const c = await db.attendance.count({ where: { date: day.date, status: s as any } });
+      counts[s] = c;
+    }
+    perDayStatusCounts.set(dayStr, counts);
+  }
+  const attendanceSummary = attendanceSummaryAgg.map(day => {
+    const key = day.date.toISOString().slice(0, 10);
+    const counts = perDayStatusCounts.get(key)!;
+    return {
+      date: day.date,
+      presentCount: counts.present,
+      absentCount: counts.absent,
+      lateCount: counts.late,
+      totalEmployees: day._count._all,
+    };
+  });
+
+  // Attendance by employee over period
+  const employeesInPeriod = await db.attendance.groupBy({
+    by: ['employeeId'],
+    where: { date: { gte: new Date(startDate), lte: new Date(endDate) } },
+  });
+  const empIds = employeesInPeriod.map(e => e.employeeId);
+  const empInfo = empIds.length
+    ? await db.employee.findMany({ where: { id: { in: empIds } }, select: { id: true, firstName: true, lastName: true, employeeCode: true } })
+    : [];
+  const empInfoMap = new Map(empInfo.map(e => [e.id, e] as const));
+  const attendanceByEmployee = await Promise.all(empIds.map(async id => {
+    const [presentDays, absentDays, lateDays, totalDays] = await Promise.all([
+      db.attendance.count({ where: { employeeId: id, date: { gte: new Date(startDate), lte: new Date(endDate) }, status: 'present' as any } }),
+      db.attendance.count({ where: { employeeId: id, date: { gte: new Date(startDate), lte: new Date(endDate) }, status: 'absent' as any } }),
+      db.attendance.count({ where: { employeeId: id, date: { gte: new Date(startDate), lte: new Date(endDate) }, status: 'late' as any } }),
+      db.attendance.count({ where: { employeeId: id, date: { gte: new Date(startDate), lte: new Date(endDate) } } }),
+    ]);
+    const info = empInfoMap.get(id);
+    return {
+      employeeName: info ? `${info.firstName} ${info.lastName ?? ''}`.trim() : 'Unknown',
+      employeeCode: info?.employeeCode ?? 'Unknown',
+      presentDays,
+      absentDays,
+      lateDays,
+      totalDays,
+    };
+  }));
+
+  // Average hours worked in period for present days
+  const avgHoursData = await db.attendance.aggregate({
+    _avg: { hoursWorked: true },
+    where: { date: { gte: new Date(startDate), lte: new Date(endDate) }, status: 'present' as any },
+  });
+  const avgHoursWorked = Number(avgHoursData._avg.hoursWorked ?? 0);
   
-  // Attendance by employee
-  const attendanceByEmployee = await db
-    .select({
-      employeeName: sql<string>`CONCAT(${employees.firstName}, ' ', ${employees.lastName})`,
-      employeeCode: employees.employeeCode,
-      presentDays: count(attendances.id).filter(eq(attendances.status, 'present')).mapWith(Number),
-      absentDays: count(attendances.id).filter(eq(attendances.status, 'absent')).mapWith(Number),
-      lateDays: count(attendances.id).filter(eq(attendances.status, 'late')).mapWith(Number),
-      totalDays: count(attendances.id).mapWith(Number),
-    })
-    .from(attendances)
-    .leftJoin(employees, eq(attendances.employeeId, employees.id))
-    .where(
-      and(
-        gte(attendances.date, startDate),
-        lte(attendances.date, endDate)
-      )
-    )
-    .groupBy(employees.firstName, employees.lastName, employees.employeeCode)
-    .orderBy(desc(count(attendances.id).filter(eq(attendances.status, 'present')).mapWith(Number)));
-  
-  // Average hours worked
-  const avgHoursWorked = await db
-    .select({
-      avgHours: avg(sql<number>`CAST(${attendances.hoursWorked} AS numeric)`).mapWith(Number),
-    })
-    .from(attendances)
-    .where(
-      and(
-        gte(attendances.date, startDate),
-        lte(attendances.date, endDate),
-        eq(attendances.status, 'present')
-      )
-    );
-  
-  return {
-    attendanceSummary,
-    attendanceByEmployee,
-    avgHoursWorked: avgHoursWorked[0]?.avgHours || 0,
-  };
+  return { attendanceSummary, attendanceByEmployee, avgHoursWorked };
 }
 
 // Payroll Reports
 export async function getPayrollReport(startDate: string, endDate: string) {
-  await requireAuth(['manajer']);
+  await requireAuthServer(['manajer']);
   
   // Payroll summary by pay period
-  const payrollSummary = await db
-    .select({
-      periodName: payPeriods.periodName,
-      startDate: payPeriods.startDate,
-      endDate: payPeriods.endDate,
-      totalEmployeesPaid: count(payrollRecords.id).mapWith(Number),
-      totalGrossSalary: sql<number>`SUM(${payrollRecords.grossSalary})::numeric`,
-      totalNetSalary: sql<number>`SUM(${payrollRecords.netSalary})::numeric`,
-    })
-    .from(payrollRecords)
-    .leftJoin(payPeriods, eq(payrollRecords.payPeriodId, payPeriods.id))
-    .where(
-      and(
-        gte(payPeriods.startDate, startDate),
-        lte(payPeriods.endDate, endDate)
-      )
-    )
-    .groupBy(payPeriods.id)
-    .orderBy(desc(payPeriods.startDate));
-  
-  // Payroll by employment type
-  const payrollByType = await db
-    .select({
-      employmentType: payrollRecords.employmentType,
-      totalEmployees: count(payrollRecords.id).mapWith(Number),
-      totalSalary: sql<number>`SUM(${payrollRecords.netSalary})::numeric`,
-      avgSalary: avg(sql<number>`CAST(${payrollRecords.netSalary} AS numeric)`).mapWith(Number),
-    })
-    .from(payrollRecords)
-    .leftJoin(payPeriods, eq(payrollRecords.payPeriodId, payPeriods.id))
-    .where(
-      and(
-        gte(payPeriods.startDate, startDate),
-        lte(payPeriods.endDate, endDate)
-      )
-    )
-    .groupBy(payrollRecords.employmentType)
-    .orderBy(payrollRecords.employmentType);
-  
-  // Top earners
-  const topEarners = await db
-    .select({
-      employeeName: sql<string>`CONCAT(${employees.firstName}, ' ', ${employees.lastName})`,
-      employeeCode: employees.employeeCode,
-      employmentType: employees.employmentType,
-      netSalary: payrollRecords.netSalary,
-      periodName: payPeriods.periodName,
-    })
-    .from(payrollRecords)
-    .leftJoin(employees, eq(payrollRecords.employeeId, employees.id))
-    .leftJoin(payPeriods, eq(payrollRecords.payPeriodId, payPeriods.id))
-    .where(
-      and(
-        gte(payPeriods.startDate, startDate),
-        lte(payPeriods.endDate, endDate)
-      )
-    )
-    .orderBy(desc(sql<number>`CAST(${payrollRecords.netSalary} AS numeric)`))
-    .limit(10);
-  
-  return {
-    payrollSummary,
-    payrollByType,
-    topEarners,
-  };
+  const periodsInRange = await db.payPeriod.findMany({
+    where: { startDate: { gte: new Date(startDate) }, endDate: { lte: new Date(endDate) } },
+    select: { id: true, periodName: true, startDate: true, endDate: true },
+    orderBy: { startDate: 'desc' },
+  });
+  const periodIds = periodsInRange.map(p => p.id);
+  const perPeriodAgg = periodIds.length
+    ? await db.payrollRecord.groupBy({ by: ['payPeriodId'], where: { payPeriodId: { in: periodIds } }, _sum: { grossSalary: true, netSalary: true }, _count: { _all: true } })
+    : [];
+  const perPeriodMap = new Map(perPeriodAgg.map(a => [a.payPeriodId, a] as const));
+  const payrollSummary = periodsInRange.map(p => ({
+    periodName: p.periodName,
+    startDate: p.startDate,
+    endDate: p.endDate,
+    totalEmployeesPaid: perPeriodMap.get(p.id)?._count._all ?? 0,
+    totalGrossSalary: Number(perPeriodMap.get(p.id)?._sum.grossSalary ?? 0),
+    totalNetSalary: Number(perPeriodMap.get(p.id)?._sum.netSalary ?? 0),
+  }));
+
+  // Payroll by employment type (within date range)
+  const recordsInRange = await db.payrollRecord.findMany({
+    where: { payPeriodId: { in: periodIds } },
+    select: { employmentType: true, netSalary: true },
+  });
+  const byTypeMap = new Map<string, { totalEmployees: number; totalSalary: number; sumForAvg: number }>();
+  for (const r of recordsInRange) {
+    const key = r.employmentType;
+    const entry = byTypeMap.get(key) ?? { totalEmployees: 0, totalSalary: 0, sumForAvg: 0 };
+    entry.totalEmployees += 1;
+    entry.totalSalary += Number(r.netSalary ?? 0);
+    entry.sumForAvg += Number(r.netSalary ?? 0);
+    byTypeMap.set(key, entry);
+  }
+  const payrollByType = Array.from(byTypeMap.entries()).map(([employmentType, v]) => ({
+    employmentType,
+    totalEmployees: v.totalEmployees,
+    totalSalary: v.totalSalary,
+    avgSalary: v.totalEmployees > 0 ? v.sumForAvg / v.totalEmployees : 0,
+  }));
+
+  // Top earners in range
+  const topEarnersRecords = await db.payrollRecord.findMany({
+    where: { payPeriodId: { in: periodIds } },
+    select: {
+      netSalary: true,
+      employee: { select: { firstName: true, lastName: true, employeeCode: true, employmentType: true } },
+      payPeriod: { select: { periodName: true } },
+    },
+    orderBy: { netSalary: 'desc' },
+    take: 10,
+  });
+  const topEarners = topEarnersRecords.map(r => ({
+    employeeName: `${r.employee.firstName} ${r.employee.lastName ?? ''}`.trim(),
+    employeeCode: r.employee.employeeCode,
+    employmentType: r.employee.employmentType,
+    netSalary: r.netSalary,
+    periodName: r.payPeriod.periodName,
+  }));
+
+  return { payrollSummary, payrollByType, topEarners };
 }
 
 // Overall Summary Report
 export async function getOverallSummary(startDate: string, endDate: string) {
-  await requireAuth(['manajer']);
+  await requireAuthServer(['manajer']);
   
-  // Total metrics
-  const totalMetrics = await db
-    .select({
-      totalIntake: sql<number>`COALESCE(SUM(${coconutIntakes.weight}), '0')::numeric`,
-      totalProduction: sql<number>`COALESCE(SUM(${productions.quantity}), '0')::numeric`,
-      totalPayroll: sql<number>`COALESCE(SUM(${payrollRecords.netSalary}), '0')::numeric`,
-      totalEmployees: count(employees.id).mapWith(Number),
-    })
-    .from(employees)
-    .fullJoin(coconutIntakes, gte(coconutIntakes.intakeDate, startDate))
-    .fullJoin(productions, gte(productions.productionDate, startDate))
-    .fullJoin(payrollRecords, sql`${payrollRecords.createdAt} >= ${sql.placeholder('startDate')}`)
-    .where(
-      and(
-        gte(coconutIntakes.intakeDate, startDate),
-        lte(coconutIntakes.intakeDate, endDate),
-        gte(productions.productionDate, startDate),
-        lte(productions.productionDate, endDate)
-      )
-    );
-  
-  // Calculate efficiency metrics
+  // Totals
+  const [intakeAgg, productionAgg, payrollAgg, employeeCount] = await Promise.all([
+    db.coconutIntake.aggregate({ _sum: { weight: true }, where: { intakeDate: { gte: new Date(startDate), lte: new Date(endDate) } } }),
+    db.production.aggregate({ _sum: { quantity: true }, where: { productionDate: { gte: new Date(startDate), lte: new Date(endDate) } } }),
+    db.payrollRecord.aggregate({ _sum: { netSalary: true }, where: { createdAt: { gte: new Date(startDate), lte: new Date(endDate) } } }),
+    db.employee.count(),
+  ]);
+
+  const totalMetrics = {
+    totalIntake: Number(intakeAgg._sum.weight ?? 0),
+    totalProduction: Number(productionAgg._sum.quantity ?? 0),
+    totalPayroll: Number(payrollAgg._sum.netSalary ?? 0),
+    totalEmployees: employeeCount,
+  };
+
   const efficiencyMetrics = {
-    // Calculate ratio of production to intake
-    productionEfficiency: totalMetrics[0]?.totalIntake && parseFloat(totalMetrics[0].totalIntake.toString()) > 0 
-      ? (parseFloat(totalMetrics[0].totalProduction?.toString() || '0') / parseFloat(totalMetrics[0].totalIntake.toString())) * 100 
-      : 0,
-    avgPayrollPerEmployee: totalMetrics[0]?.totalEmployees && totalMetrics[0].totalEmployees > 0
-      ? parseFloat(totalMetrics[0].totalPayroll?.toString() || '0') / totalMetrics[0].totalEmployees
-      : 0,
+    productionEfficiency: totalMetrics.totalIntake > 0 ? (totalMetrics.totalProduction / totalMetrics.totalIntake) * 100 : 0,
+    avgPayrollPerEmployee: totalMetrics.totalEmployees > 0 ? totalMetrics.totalPayroll / totalMetrics.totalEmployees : 0,
   };
   
-  return {
-    totalMetrics: totalMetrics[0],
-    efficiencyMetrics,
-  };
+  return { totalMetrics, efficiencyMetrics };
 }
 
 // Control Variance Report (Intake vs Production)
 export async function getControlVarianceReport(startDate: string, endDate: string) {
-  await requireAuth(['manajer']);
+  await requireAuthServer(['manajer']);
   
-  // Get total intake and production for the period
-  const intakeData = await db
-    .select({
-      date: coconutIntakes.intakeDate,
-      totalWeight: sql<number>`SUM(${coconutIntakes.weight})::numeric`,
-    })
-    .from(coconutIntakes)
-    .where(
-      and(
-        gte(coconutIntakes.intakeDate, startDate),
-        lte(coconutIntakes.intakeDate, endDate)
-      )
-    )
-    .groupBy(coconutIntakes.intakeDate)
-    .orderBy(coconutIntakes.intakeDate);
-  
-  const productionData = await db
-    .select({
-      date: productions.productionDate,
-      totalQuantity: sql<number>`SUM(${productions.quantity})::numeric`,
-    })
-    .from(productions)
-    .where(
-      and(
-        gte(productions.productionDate, startDate),
-        lte(productions.productionDate, endDate)
-      )
-    )
-    .groupBy(productions.productionDate)
-    .orderBy(productions.productionDate);
-  
-  // Calculate variance by date
-  const varianceData = [];
-  
-  // Create maps for easier lookup
-  const intakeMap = new Map();
-  intakeData.forEach(item => {
-    intakeMap.set(item.date, parseFloat(item.totalWeight.toString()));
+  const intakeByDate = await db.coconutIntake.groupBy({
+    by: ['intakeDate'],
+    where: { intakeDate: { gte: new Date(startDate), lte: new Date(endDate) } },
+    _sum: { weight: true },
+    orderBy: { intakeDate: 'asc' },
   });
-  
-  const productionMap = new Map();
-  productionData.forEach(item => {
-    productionMap.set(item.date, parseFloat(item.totalQuantity.toString()));
+  const productionByDate = await db.production.groupBy({
+    by: ['productionDate'],
+    where: { productionDate: { gte: new Date(startDate), lte: new Date(endDate) } },
+    _sum: { quantity: true },
+    orderBy: { productionDate: 'asc' },
   });
-  
-  // Get unique dates
-  const allDates = new Set([
-    ...intakeData.map(i => i.date),
-    ...productionData.map(p => p.date)
-  ]);
-  
-  for (const date of Array.from(allDates).sort()) {
-    const intakeValue = intakeMap.get(date) || 0;
-    const productionValue = productionMap.get(date) || 0;
-    const variance = intakeValue - productionValue;
-    const variancePercentage = intakeValue > 0 ? (variance / intakeValue) * 100 : 0;
-    
-    varianceData.push({
-      date,
-      intake: intakeValue,
-      production: productionValue,
-      variance,
-      variancePercentage,
-    });
-  }
-  
-  // Calculate overall variance
-  const totalIntake = intakeData.reduce((sum, item) => sum + parseFloat(item.totalWeight.toString()), 0);
-  const totalProduction = productionData.reduce((sum, item) => sum + parseFloat(item.totalQuantity.toString()), 0);
+
+  const intakeMap = new Map(intakeByDate.map(i => [i.intakeDate.toISOString().slice(0,10), Number(i._sum.weight ?? 0)] as const));
+  const prodMap = new Map(productionByDate.map(p => [p.productionDate.toISOString().slice(0,10), Number(p._sum.quantity ?? 0)] as const));
+
+  const allDates = new Set<string>([...intakeMap.keys(), ...prodMap.keys()]);
+  const varianceData = Array.from(allDates).sort().map(date => {
+    const intake = intakeMap.get(date) ?? 0;
+    const production = prodMap.get(date) ?? 0;
+    const variance = intake - production;
+    const variancePercentage = intake > 0 ? (variance / intake) * 100 : 0;
+    return { date, intake, production, variance, variancePercentage };
+  });
+
+  const totalIntake = Array.from(intakeMap.values()).reduce((a, b) => a + b, 0);
+  const totalProduction = Array.from(prodMap.values()).reduce((a, b) => a + b, 0);
   const overallVariance = totalIntake - totalProduction;
   const overallVariancePercentage = totalIntake > 0 ? (overallVariance / totalIntake) * 100 : 0;
-  
-  return {
-    varianceData,
-    totalIntake,
-    totalProduction,
-    overallVariance,
-    overallVariancePercentage,
-  };
+
+  return { varianceData, totalIntake, totalProduction, overallVariance, overallVariancePercentage };
 }

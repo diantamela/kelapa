@@ -3,18 +3,18 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
-import { getCurrentUser } from '@/lib/auth/middleware';
 
 export default function Navbar() {
   const [user, setUser] = useState<any>(null);
   const pathname = usePathname();
 
   useEffect(() => {
-    // Get current user info
+    // Get current user info from API
     const fetchUser = async () => {
       try {
-        const userData = await getCurrentUser();
-        setUser(userData);
+        const response = await fetch('/api/auth/current');
+        const data = await response.json();
+        setUser(data.user);
       } catch (error) {
         console.error('Error fetching user:', error);
       }

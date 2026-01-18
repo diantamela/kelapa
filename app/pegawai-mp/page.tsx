@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { requireAuth } from '@/lib/auth/middleware';
+import { requireAuthClient } from '@/lib/auth/client-utils';
 import Link from 'next/link';
 
 export default function MPDashboard() {
@@ -11,7 +11,7 @@ export default function MPDashboard() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const userData = await requireAuth(['pegawai_mp', 'staff_hr', 'manajer']);
+        const userData = await requireAuthClient(['pegawai_mp', 'staff_hr', 'manajer']);
         setUser(userData);
       } catch (error) {
         console.error('Authentication error:', error);

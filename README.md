@@ -25,7 +25,7 @@ A comprehensive system for managing coconut factory operations including raw mat
 
 The application follows a modular architecture with the following components:
 
-- **Database Layer**: Drizzle ORM with PostgreSQL
+- **Database Layer**: Prisma ORM with PostgreSQL
 - **Service Layer**: Business logic in `/lib` directory
 - **API Layer**: Next.js API routes in `/app/api`
 - **Presentation Layer**: React components in `/app` and `/components`

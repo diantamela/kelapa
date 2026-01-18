@@ -8,18 +8,19 @@ import {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id);
-    if (isNaN(id)) {
+    const { id } = await params;
+    const parsedId = parseInt(id);
+    if (isNaN(parsedId)) {
       return Response.json(
         { success: false, message: 'Invalid distributor ID' },
         { status: 400 }
       );
     }
 
-    const distributor = await getDistributorById(id);
+    const distributor = await getDistributorById(parsedId);
     if (!distributor) {
       return Response.json(
         { success: false, message: 'Distributor not found' },
@@ -39,11 +40,12 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id);
-    if (isNaN(id)) {
+    const { id } = await params;
+    const parsedId = parseInt(id);
+    if (isNaN(parsedId)) {
       return Response.json(
         { success: false, message: 'Invalid distributor ID' },
         { status: 400 }
@@ -51,7 +53,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const result = await updateDistributor(id, body);
+    const result = await updateDistributor(parsedId, body);
 
     return Response.json({ distributor: result }, { status: 200 });
   } catch (error) {
@@ -65,18 +67,19 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id);
-    if (isNaN(id)) {
+    const { id } = await params;
+    const parsedId = parseInt(id);
+    if (isNaN(parsedId)) {
       return Response.json(
         { success: false, message: 'Invalid distributor ID' },
         { status: 400 }
       );
     }
 
-    const result = await deleteDistributor(id);
+    const result = await deleteDistributor(parsedId);
 
     return Response.json({ distributor: result }, { status: 200 });
   } catch (error) {

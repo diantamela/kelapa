@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { requireAuth } from '@/lib/auth/middleware';
+import { requireAuthServer } from '@/lib/auth/server-utils';
 import { AttendanceStatus, PayrollStatus } from '@prisma/client';
 
 export interface EmployeeInput {
@@ -37,7 +37,7 @@ export interface ProcessPayrollParams {
 
 // Employee Services
 export async function getAllEmployees(filters?: { employmentType?: string; isActive?: boolean }) {
-  await requireAuth(['staff_hr', 'manajer']);
+  await requireAuthServer(['staff_hr', 'manajer']);
   
   return db.employee.findMany({
     select: {
@@ -73,7 +73,7 @@ export async function getAllEmployees(filters?: { employmentType?: string; isAct
 }
 
 export async function getEmployeeById(id: number) {
-  await requireAuth(['staff_hr', 'manajer']);
+  await requireAuthServer(['staff_hr', 'manajer']);
   
   return db.employee.findUnique({
     where: { id },
@@ -104,7 +104,7 @@ export async function getEmployeeById(id: number) {
 }
 
 export async function createEmployee(data: EmployeeInput) {
-  await requireAuth(['staff_hr']);
+  await requireAuthServer(['staff_hr']);
   
   return db.employee.create({
     data: {
@@ -115,7 +115,7 @@ export async function createEmployee(data: EmployeeInput) {
 }
 
 export async function updateEmployee(id: number, data: Partial<EmployeeInput>) {
-  await requireAuth(['staff_hr']);
+  await requireAuthServer(['staff_hr']);
   
   return db.employee.update({
     where: { id },
@@ -133,7 +133,7 @@ export async function getAllAttendances(filters?: {
   employeeId?: number;
   status?: AttendanceStatus;
 }) {
-  await requireAuth(['staff_hr', 'manajer']);
+  await requireAuthServer(['staff_hr', 'manajer']);
   
   return db.attendance.findMany({
     select: {
@@ -172,7 +172,7 @@ export async function getAllAttendances(filters?: {
 }
 
 export async function getAttendanceById(id: number) {
-  await requireAuth(['staff_hr', 'manajer']);
+  await requireAuthServer(['staff_hr', 'manajer']);
   
   return db.attendance.findUnique({
     where: { id },
@@ -201,7 +201,7 @@ export async function getAttendanceById(id: number) {
 }
 
 export async function createAttendance(data: AttendanceInput) {
-  await requireAuth(['staff_hr']);
+  await requireAuthServer(['staff_hr']);
   
   // Calculate hours worked if both checkIn and checkOut are provided
   let hoursWorked: string | undefined;
@@ -230,7 +230,7 @@ export async function createAttendance(data: AttendanceInput) {
 }
 
 export async function updateAttendance(id: number, data: Partial<AttendanceInput>) {
-  await requireAuth(['staff_hr']);
+  await requireAuthServer(['staff_hr']);
   
   // Calculate hours worked if both checkIn and checkOut are provided
   const updateData: any = { ...data, updatedAt: new Date() };
@@ -260,7 +260,7 @@ export async function updateAttendance(id: number, data: Partial<AttendanceInput
 
 // Pay Period Services
 export async function getAllPayPeriods() {
-  await requireAuth(['staff_hr', 'manajer']);
+  await requireAuthServer(['staff_hr', 'manajer']);
   
   return db.payPeriod.findMany({
     orderBy: {
@@ -270,7 +270,7 @@ export async function getAllPayPeriods() {
 }
 
 export async function getPayPeriodById(id: number) {
-  await requireAuth(['staff_hr', 'manajer']);
+  await requireAuthServer(['staff_hr', 'manajer']);
   
   return db.payPeriod.findUnique({
     where: { id }
@@ -278,7 +278,7 @@ export async function getPayPeriodById(id: number) {
 }
 
 export async function createPayPeriod(data: PayPeriodInput) {
-  await requireAuth(['staff_hr']);
+  await requireAuthServer(['staff_hr']);
   
   return db.payPeriod.create({
     data
@@ -286,7 +286,7 @@ export async function createPayPeriod(data: PayPeriodInput) {
 }
 
 export async function updatePayPeriod(id: number, data: Partial<PayPeriodInput>) {
-  await requireAuth(['staff_hr']);
+  await requireAuthServer(['staff_hr']);
   
   return db.payPeriod.update({
     where: { id },
@@ -299,7 +299,7 @@ export async function updatePayPeriod(id: number, data: Partial<PayPeriodInput>)
 
 // Payroll Processing Services
 export async function processPayroll(params: ProcessPayrollParams) {
-  await requireAuth(['staff_hr']);
+  await requireAuthServer(['staff_hr']);
   
   // Get the pay period
   const payPeriod = await getPayPeriodById(params.payPeriodId);
@@ -462,7 +462,7 @@ async function processContractWorkerPayroll(employee: any, payPeriod: any) {
 
 // Payroll Records Services
 export async function getAllPayrollRecords(filters?: { payPeriodId?: number; employeeId?: number; status?: PayrollStatus }) {
-  await requireAuth(['staff_hr', 'manajer']);
+  await requireAuthServer(['staff_hr', 'manajer']);
   
   return db.payrollRecord.findMany({
     select: {
@@ -510,7 +510,7 @@ export async function getAllPayrollRecords(filters?: { payPeriodId?: number; emp
 }
 
 export async function getPayrollRecordById(id: number) {
-  await requireAuth(['staff_hr', 'manajer']);
+  await requireAuthServer(['staff_hr', 'manajer']);
   
   return db.payrollRecord.findUnique({
     where: { id },
@@ -556,7 +556,7 @@ export async function getPayrollRecordById(id: number) {
 
 // Finalize Payroll
 export async function finalizePayroll(payPeriodId: number) {
-  await requireAuth(['staff_hr']);
+  await requireAuthServer(['staff_hr']);
   
   // Update pay period status to final
   await db.payPeriod.update({
