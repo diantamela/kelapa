@@ -1,7 +1,6 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { UserRole } from '@prisma/client';
 import {
   verifyPassword,
   generateToken,
@@ -84,7 +83,7 @@ export async function registerUser(userData: RegisterData): Promise<{ success: b
         name: userData.name,
         email: userData.email,
         password: hashedPassword,
-        role: userData.role as unknown as UserRole,
+        role: userData.role,
       }
     });
 

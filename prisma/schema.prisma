@@ -10,44 +10,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum UserRole {
-  pegawai_rmp
-  pegawai_mp
-  staff_hr
-  manajer
-}
-
-enum AttendanceStatus {
-  present
-  absent
-  late
-  early_leave
-}
-
-enum PayrollStatus {
-  draft
-  validated
-  final
-}
-
-enum ProductionType {
-  manual
-  machine
-  shaler
-}
-
-enum QualityGrade {
-  premium
-  standard
-  low
-}
-
 model User {
   id        Int      @id @default(autoincrement())
   name      String
   email     String   @unique
   password  String
-  role      UserRole
+  role      String   // UserRole enum diganti menjadi String
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -73,10 +41,10 @@ model Distributor {
 
 model CoconutIntake {
   id            Int          @id @default(autoincrement())
-  intakeDate    DateTime     @db.Date
+  intakeDate    DateTime     // Tidak ada anotasi @db.Date untuk SQLite
   distributorId Int?
-  weight        Decimal      @db.Decimal(10, 2)
-  grade         QualityGrade
+  weight        Float        // Tidak ada Decimal untuk SQLite, gunakan Float
+  grade         String       // QualityGrade enum diganti menjadi String
   notes         String?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
@@ -89,9 +57,9 @@ model CoconutIntake {
 model SortingRecord {
   id           Int      @id @default(autoincrement())
   intakeId     Int
-  sortedDate   DateTime @db.Date
-  goodCoconuts Decimal? @db.Decimal(10, 2)
-  badCoconuts  Decimal? @db.Decimal(10, 2)
+  sortedDate   DateTime // Tidak ada anotasi @db.Date untuk SQLite
+  goodCoconuts Float?   // Tidak ada Decimal untuk SQLite, gunakan Float
+  badCoconuts  Float?   // Tidak ada Decimal untuk SQLite, gunakan Float
   notes        String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -109,10 +77,10 @@ model Employee {
   position       String?
   division       String?
   employmentType String
-  hourlyRate     Decimal? @db.Decimal(10, 2)
-  dailyRate      Decimal? @db.Decimal(10, 2)
+  hourlyRate     Float?   // Tidak ada Decimal untuk SQLite, gunakan Float
+  dailyRate      Float?   // Tidak ada Decimal untuk SQLite, gunakan Float
   isActive       Boolean  @default(true)
-  hireDate       DateTime? @db.Date
+  hireDate       DateTime? // Tidak ada anotasi @db.Date untuk SQLite
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -127,7 +95,7 @@ model JobRate {
   id          Int      @id @default(autoincrement())
   jobType     String
   unit        String
-  ratePerUnit Decimal  @db.Decimal(10, 2)
+  ratePerUnit Float    // Tidak ada Decimal untuk SQLite, gunakan Float
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -138,11 +106,11 @@ model JobRate {
 model Attendance {
   id            Int             @id @default(autoincrement())
   employeeId    Int
-  date          DateTime        @db.Date
+  date          DateTime        // Tidak ada anotasi @db.Date untuk SQLite
   checkIn       DateTime?
   checkOut      DateTime?
-  status        AttendanceStatus
-  hoursWorked   Decimal?        @db.Decimal(4, 2)
+  status        String          // AttendanceStatus enum diganti menjadi String
+  hoursWorked   Float?          // Tidak ada Decimal untuk SQLite, gunakan Float
   mealAllowance Boolean         @default(false)
   notes         String?
   createdAt     DateTime        @default(now())
@@ -154,10 +122,10 @@ model Attendance {
 
 model Production {
   id             Int           @id @default(autoincrement())
-  productionDate DateTime      @db.Date
-  productionType ProductionType
+  productionDate DateTime      // Tidak ada anotasi @db.Date untuk SQLite
+  productionType String        // ProductionType enum diganti menjadi String
   employeeId     Int?
-  quantity       Decimal       @db.Decimal(10, 2)
+  quantity       Float         // Tidak ada Decimal untuk SQLite, gunakan Float
   unit           String
   notes          String?
   createdAt      DateTime      @default(now())
@@ -170,11 +138,11 @@ model Production {
 model PayPeriod {
   id         Int           @id @default(autoincrement())
   periodName String
-  startDate  DateTime      @db.Date
-  endDate    DateTime      @db.Date
-  status     PayrollStatus @default(draft)
+  startDate  DateTime      // Tidak ada anotasi @db.Date untuk SQLite
+  endDate    DateTime      // Tidak ada anotasi @db.Date untuk SQLite
+  status     String        // PayrollStatus enum diganti menjadi String
   createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  updatedAt  DateTime      @default(now())
 
   payrollRecords PayrollRecord[]
   @@map("pay_periods")
@@ -186,17 +154,17 @@ model PayrollRecord {
   employeeId     Int
   employmentType String
   daysWorked     Int?
-  dailyRate      Decimal?      @db.Decimal(10, 2)
-  dailySalary    Decimal?      @db.Decimal(10, 2)
-  totalProduction Decimal?     @db.Decimal(10, 2)
-  ratePerUnit    Decimal?      @db.Decimal(10, 2)
-  contractSalary Decimal?      @db.Decimal(10, 2)
-  mealAllowance  Decimal?      @db.Decimal(10, 2)
-  bonuses        Decimal       @default(0) @db.Decimal(10, 2)
-  deductions     Decimal       @default(0) @db.Decimal(10, 2)
-  grossSalary    Decimal?      @db.Decimal(10, 2)
-  netSalary      Decimal?      @db.Decimal(10, 2)
-  status         PayrollStatus
+  dailyRate      Float?        // Tidak ada Decimal untuk SQLite, gunakan Float
+  dailySalary    Float?        // Tidak ada Decimal untuk SQLite, gunakan Float
+  totalProduction Float?        // Tidak ada Decimal untuk SQLite, gunakan Float
+  ratePerUnit    Float?        // Tidak ada Decimal untuk SQLite, gunakan Float
+  contractSalary Float?        // Tidak ada Decimal untuk SQLite, gunakan Float
+  mealAllowance  Float?        // Tidak ada Decimal untuk SQLite, gunakan Float
+  bonuses        Float         @default(0) // Tidak ada Decimal untuk SQLite, gunakan Float
+  deductions     Float         @default(0) // Tidak ada Decimal untuk SQLite, gunakan Float
+  grossSalary    Float?        // Tidak ada Decimal untuk SQLite, gunakan Float
+  netSalary      Float?        // Tidak ada Decimal untuk SQLite, gunakan Float
+  status         String        // PayrollStatus enum diganti menjadi String
   processedAt    DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
@@ -209,7 +177,7 @@ model PayrollRecord {
 model Report {
   id         Int      @id @default(autoincrement())
   reportType String
-  reportDate DateTime @db.Date
+  reportDate DateTime // Tidak ada anotasi @db.Date untuk SQLite
   data       String
   createdBy  Int?
   createdAt  DateTime @default(now())

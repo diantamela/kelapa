@@ -2,7 +2,6 @@
 
 import { db } from '@/lib/db';
 import { requireAuthServer } from '@/lib/auth/server-utils';
-import { ProductionType } from '@prisma/client';
 
 export interface ProductionInput {
   productionDate: string;
@@ -34,7 +33,7 @@ export async function getAllProductions(filters?: {
       where.employeeId = filters.employeeId;
     }
     if (filters.productionType) {
-      where.productionType = filters.productionType as unknown as ProductionType;
+      where.productionType = filters.productionType;
     }
   }
 
@@ -68,7 +67,7 @@ export async function createProduction(data: ProductionInput) {
   return await db.production.create({
     data: {
       productionDate: new Date(data.productionDate),
-      productionType: data.productionType as unknown as ProductionType,
+      productionType: data.productionType,
       employeeId: data.employeeId,
       quantity: parseFloat(data.quantity),
       unit: data.unit,
@@ -84,7 +83,7 @@ export async function updateProduction(id: number, data: Partial<ProductionInput
     where: { id },
     data: {
       ...data,
-      productionType: data.productionType as unknown as ProductionType,
+      productionType: data.productionType,
       quantity: data.quantity ? parseFloat(data.quantity) : undefined,
       updatedAt: new Date(),
     },

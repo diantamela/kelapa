@@ -2,7 +2,6 @@
 
 import { db } from '@/lib/db';
 import { requireAuthServer } from '@/lib/auth/server-utils';
-import { AttendanceStatus, PayrollStatus } from '@prisma/client';
 
 export interface EmployeeInput {
   employeeCode: string;
@@ -11,8 +10,8 @@ export interface EmployeeInput {
   position?: string;
   division?: string;
   employmentType: string; // 'daily' or 'contract'
-  hourlyRate?: string;
-  dailyRate?: string;
+  hourlyRate?: number;
+  dailyRate?: number;
   hireDate?: string;
 }
 
@@ -21,7 +20,7 @@ export interface AttendanceInput {
   date: string;
   checkIn?: string;
   checkOut?: string;
-  status: AttendanceStatus; // present | absent | late | early_leave
+  status: string; // present | absent | late | early_leave
   notes?: string;
 }
 
@@ -29,6 +28,7 @@ export interface PayPeriodInput {
   periodName: string;
   startDate: string;
   endDate: string;
+  status: string;
 }
 
 export interface ProcessPayrollParams {
@@ -131,7 +131,7 @@ export async function getAllAttendances(filters?: {
   startDate?: string;
   endDate?: string;
   employeeId?: number;
-  status?: AttendanceStatus;
+  status?: string;
 }) {
   await requireAuthServer(['staff_hr', 'manajer']);
   
@@ -204,16 +204,16 @@ export async function createAttendance(data: AttendanceInput) {
   await requireAuthServer(['staff_hr']);
   
   // Calculate hours worked if both checkIn and checkOut are provided
-  let hoursWorked: string | undefined;
+  let hoursWorked: number | undefined;
   let mealAllowance = false;
-  
+
   if (data.checkIn && data.checkOut) {
     const checkInTime = new Date(data.checkIn);
     const checkOutTime = new Date(data.checkOut);
     const diffMs = checkOutTime.getTime() - checkInTime.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
-    hoursWorked = diffHours.toFixed(2);
-    
+    hoursWorked = parseFloat(diffHours.toFixed(2));
+
     // Set meal allowance if worked more than 8 hours
     if (diffHours > 8) {
       mealAllowance = true;
@@ -234,19 +234,19 @@ export async function updateAttendance(id: number, data: Partial<AttendanceInput
   
   // Calculate hours worked if both checkIn and checkOut are provided
   const updateData: any = { ...data, updatedAt: new Date() };
-  
+
   if (data.checkIn || data.checkOut) {
     const existing = await getAttendanceById(id);
     const checkIn = data.checkIn || existing?.checkIn?.toString();
     const checkOut = data.checkOut || existing?.checkOut?.toString();
-    
+
     if (checkIn && checkOut) {
       const checkInTime = new Date(checkIn);
       const checkOutTime = new Date(checkOut);
       const diffMs = checkOutTime.getTime() - checkInTime.getTime();
       const diffHours = diffMs / (1000 * 60 * 60);
-      updateData.hoursWorked = diffHours.toFixed(2);
-      
+      updateData.hoursWorked = parseFloat(diffHours.toFixed(2));
+
       // Set meal allowance if worked more than 8 hours
       updateData.mealAllowance = diffHours > 8;
     }
@@ -327,7 +327,7 @@ export async function processPayroll(params: ProcessPayrollParams) {
   await db.payPeriod.update({
     where: { id: params.payPeriodId },
     data: {
-      status: PayrollStatus.validated,
+      status: 'validated',
       updatedAt: new Date()
     }
   });
@@ -391,7 +391,7 @@ async function processDailyWorkerPayroll(employee: any, payPeriod: any) {
       mealAllowance: mealAllowanceAmount,
       grossSalary,
       netSalary,
-      status: PayrollStatus.validated,
+      status: 'validated',
     }
   });
 }
@@ -455,13 +455,13 @@ async function processContractWorkerPayroll(employee: any, payPeriod: any) {
       contractSalary,
       grossSalary,
       netSalary,
-      status: PayrollStatus.validated,
+      status: 'validated',
     }
   });
 }
 
 // Payroll Records Services
-export async function getAllPayrollRecords(filters?: { payPeriodId?: number; employeeId?: number; status?: PayrollStatus }) {
+export async function getAllPayrollRecords(filters?: { payPeriodId?: number; employeeId?: number; status?: string }) {
   await requireAuthServer(['staff_hr', 'manajer']);
   
   return db.payrollRecord.findMany({
@@ -561,13 +561,13 @@ export async function finalizePayroll(payPeriodId: number) {
   // Update pay period status to final
   await db.payPeriod.update({
     where: { id: payPeriodId },
-    data: { status: PayrollStatus.final, updatedAt: new Date() }
+    data: { status: 'final', updatedAt: new Date() }
   });
-  
+
   // Update all payroll records in this period to final
   await db.payrollRecord.updateMany({
     where: { payPeriodId },
-    data: { status: PayrollStatus.final, processedAt: new Date(), updatedAt: new Date() }
+    data: { status: 'final', processedAt: new Date(), updatedAt: new Date() }
   });
   
   return { success: true, message: 'Payroll finalized successfully' };

@@ -2,7 +2,6 @@
 
 import { db } from '@/lib/db';
 import { requireAuthServer } from '@/lib/auth/server-utils';
-import { QualityGrade } from '@prisma/client';
 
 export interface DistributorInput {
   name: string;
@@ -126,7 +125,7 @@ export async function createCoconutIntake(data: CoconutIntakeInput) {
       intakeDate: new Date(data.intakeDate),
       distributorId: data.distributorId,
       weight: parseFloat(data.weight),
-      grade: data.grade as unknown as QualityGrade,
+      grade: data.grade,
       notes: data.notes,
     },
   });
