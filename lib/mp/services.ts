@@ -1,14 +1,8 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { 
-  productions, 
-  employees,
-  jobRates,
-  users 
-} from '@/lib/db/schema';
-import { eq, and, gte, lte, desc, sql } from 'drizzle-orm';
 import { requireAuth } from '@/lib/auth/middleware';
+import { ProductionType } from '@prisma/client';
 
 export interface ProductionInput {
   productionDate: string;
@@ -20,225 +14,188 @@ export interface ProductionInput {
 }
 
 // Production Services
-export async function getAllProductions(filters?: { 
-  startDate?: string; 
-  endDate?: string; 
+export async function getAllProductions(filters?: {
+  startDate?: string;
+  endDate?: string;
   employeeId?: number;
   productionType?: string;
 }) {
   await requireAuth(['pegawai_mp', 'staff_hr', 'manajer']);
-  
-  let query = db
-    .select({
-      id: productions.id,
-      productionDate: productions.productionDate,
-      productionType: productions.productionType,
-      quantity: productions.quantity,
-      unit: productions.unit,
-      notes: productions.notes,
-      employee: {
-        id: employees.id,
-        firstName: employees.firstName,
-        lastName: employees.lastName,
-        employeeCode: employees.employeeCode,
-      },
-      createdAt: productions.createdAt,
-    })
-    .from(productions)
-    .leftJoin(employees, eq(productions.employeeId, employees.id));
 
+  const where: any = {};
   if (filters) {
     if (filters.startDate && filters.endDate) {
-      query = query.where(
-        and(
-          gte(productions.productionDate, filters.startDate),
-          lte(productions.productionDate, filters.endDate)
-        )
-      );
+      where.productionDate = {
+        gte: new Date(filters.startDate),
+        lte: new Date(filters.endDate),
+      };
     }
     if (filters.employeeId) {
-      query = query.where(eq(productions.employeeId, filters.employeeId));
+      where.employeeId = filters.employeeId;
     }
     if (filters.productionType) {
-      query = query.where(eq(productions.productionType, filters.productionType));
+      where.productionType = filters.productionType as unknown as ProductionType;
     }
   }
 
-  return await query.orderBy(desc(productions.productionDate));
+  return await db.production.findMany({
+    where,
+    include: {
+      employee: {
+        select: { id: true, firstName: true, lastName: true, employeeCode: true },
+      },
+    },
+    orderBy: { productionDate: 'desc' },
+  });
 }
 
 export async function getProductionById(id: number) {
   await requireAuth(['pegawai_mp', 'staff_hr', 'manajer']);
-  
-  const [production] = await db
-    .select({
-      id: productions.id,
-      productionDate: productions.productionDate,
-      productionType: productions.productionType,
-      quantity: productions.quantity,
-      unit: productions.unit,
-      notes: productions.notes,
+
+  return await db.production.findUnique({
+    where: { id },
+    include: {
       employee: {
-        id: employees.id,
-        firstName: employees.firstName,
-        lastName: employees.lastName,
-        employeeCode: employees.employeeCode,
-        position: employees.position,
-        division: employees.division,
+        select: { id: true, firstName: true, lastName: true, employeeCode: true, position: true, division: true },
       },
-      createdAt: productions.createdAt,
-      updatedAt: productions.updatedAt,
-    })
-    .from(productions)
-    .leftJoin(employees, eq(productions.employeeId, employees.id))
-    .where(eq(productions.id, id));
-  
-  return production;
+    },
+  });
 }
 
 export async function createProduction(data: ProductionInput) {
   const user = await requireAuth(['pegawai_mp']);
-  
-  const [result] = await db
-    .insert(productions)
-    .values({
-      productionDate: data.productionDate,
-      productionType: data.productionType,
+
+  return await db.production.create({
+    data: {
+      productionDate: new Date(data.productionDate),
+      productionType: data.productionType as unknown as ProductionType,
       employeeId: data.employeeId,
-      quantity: data.quantity,
+      quantity: parseFloat(data.quantity),
       unit: data.unit,
       notes: data.notes,
-    })
-    .returning();
-  
-  return result;
+    },
+  });
 }
 
 export async function updateProduction(id: number, data: Partial<ProductionInput>) {
   await requireAuth(['pegawai_mp']);
-  
-  const [result] = await db
-    .update(productions)
-    .set({
+
+  return await db.production.update({
+    where: { id },
+    data: {
       ...data,
+      productionType: data.productionType as unknown as ProductionType,
+      quantity: data.quantity ? parseFloat(data.quantity) : undefined,
       updatedAt: new Date(),
-    })
-    .where(eq(productions.id, id))
-    .returning();
-  
-  return result;
+    },
+  });
 }
 
 export async function deleteProduction(id: number) {
   await requireAuth(['pegawai_mp']);
-  
-  const [result] = await db
-    .delete(productions)
-    .where(eq(productions.id, id))
-    .returning();
-  
-  return result;
+
+  return await db.production.delete({
+    where: { id },
+  });
 }
 
 // Job Rates Services
 export async function getAllJobRates() {
   await requireAuth(['pegawai_mp', 'staff_hr', 'manajer']);
-  
-  return await db
-    .select()
-    .from(jobRates)
-    .where(eq(jobRates.isActive, true))
-    .orderBy(desc(jobRates.createdAt));
+
+  return await db.jobRate.findMany({
+    where: { isActive: true },
+    orderBy: { createdAt: 'desc' },
+  });
 }
 
 export async function getJobRateById(id: number) {
   await requireAuth(['pegawai_mp', 'staff_hr', 'manajer']);
-  
-  const [rate] = await db
-    .select()
-    .from(jobRates)
-    .where(and(
-      eq(jobRates.id, id),
-      eq(jobRates.isActive, true)
-    ));
-  
-  return rate;
+
+  return await db.jobRate.findUnique({
+    where: { id, isActive: true },
+  });
 }
 
 // Employee Production Summary
 export async function getEmployeeProductionSummary(employeeId: number, startDate: string, endDate: string) {
   await requireAuth(['pegawai_mp', 'staff_hr', 'manajer']);
-  
-  const results = await db
-    .select({
-      productionType: productions.productionType,
-      totalQuantity: sql<number>`SUM(${productions.quantity})::numeric`,
-      count: sql<number>`COUNT(*)::integer`,
-    })
-    .from(productions)
-    .where(
-      and(
-        eq(productions.employeeId, employeeId),
-        gte(productions.productionDate, startDate),
-        lte(productions.productionDate, endDate)
-      )
-    )
-    .groupBy(productions.productionType);
-  
-  return results;
+
+  const results = await db.production.groupBy({
+    by: ['productionType'],
+    where: {
+      employeeId,
+      productionDate: {
+        gte: new Date(startDate),
+        lte: new Date(endDate),
+      },
+    },
+    _sum: {
+      quantity: true,
+    },
+    _count: true,
+  });
+
+  return results.map(r => ({
+    productionType: r.productionType,
+    totalQuantity: r._sum.quantity || 0,
+    count: r._count,
+  }));
 }
 
 // Estimate Salary Based on Production
 export async function estimateSalaryFromProduction(employeeId: number, startDate: string, endDate: string) {
   await requireAuth(['pegawai_mp']); // Only allow employee to view their own
-  
+
   const currentUser = await requireAuth();
-  const employee = await db.query.employees.findFirst({
-    where: eq(employees.id, employeeId),
+  const employee = await db.employee.findUnique({
+    where: { id: employeeId },
   });
-  
+
   if (!employee || (currentUser.userId !== employee.userId && currentUser.role !== 'staff_hr')) {
     throw new Error('Unauthorized to view this employee\'s salary');
   }
-  
+
   // Get total production for the period
-  const totalProduction = await db
-    .select({
-      productionType: productions.productionType,
-      totalQuantity: sql<number>`SUM(${productions.quantity})::numeric`,
-    })
-    .from(productions)
-    .where(
-      and(
-        eq(productions.employeeId, employeeId),
-        gte(productions.productionDate, startDate),
-        lte(productions.productionDate, endDate)
-      )
-    )
-    .groupBy(productions.productionType);
-  
+  const totalProduction = await db.production.groupBy({
+    by: ['productionType'],
+    where: {
+      employeeId,
+      productionDate: {
+        gte: new Date(startDate),
+        lte: new Date(endDate),
+      },
+    },
+    _sum: {
+      quantity: true,
+    },
+  });
+
   // Calculate estimated salary based on job rates
   let estimatedSalary = 0;
-  
+
   for (const prod of totalProduction) {
-    const jobRate = await db.query.jobRates.findFirst({
-      where: and(
-        eq(jobRates.jobType, prod.productionType),
-        eq(jobRates.isActive, true)
-      ),
+    const jobRate = await db.jobRate.findFirst({
+      where: {
+        jobType: prod.productionType,
+        isActive: true,
+      },
     });
-    
+
     if (jobRate) {
-      const amount = Number(prod.totalQuantity) * Number(jobRate.ratePerUnit);
+      const amount = Number(prod._sum.quantity ?? 0) * Number(jobRate.ratePerUnit);
       estimatedSalary += amount;
     }
   }
-  
+
   return {
     employeeId,
     startDate,
     endDate,
-    totalProduction,
+    totalProduction: totalProduction.map(p => ({
+      productionType: p.productionType,
+      totalQuantity: p._sum.quantity || 0,
+    })),
     estimatedSalary: estimatedSalary.toFixed(2),
   };
 }

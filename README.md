@@ -17,7 +17,7 @@ A comprehensive system for managing coconut factory operations including raw mat
 
 - **Frontend**: Next.js 16.1.1 with App Router
 - **Styling**: Tailwind CSS
-- **Database**: PostgreSQL with Drizzle ORM
+- **Database**: PostgreSQL with Prisma ORM
 - **Authentication**: JWT-based authentication
 - **UI Components**: shadcn/ui (using Radix UI and Lucide React)
 
@@ -69,7 +69,7 @@ cp .env.example .env.local
 # Update DATABASE_URL and JWT_SECRET in .env.local
 ```
 
-3. Generate database schema:
+3. Generate Prisma client:
 ```bash
 npm run db:generate
 ```
@@ -146,19 +146,19 @@ The application will be available at http://localhost:3000
 
 ## Database Schema
 
-The application uses the following main tables:
+The application uses Prisma ORM with the following main models:
 
-- `users`: User accounts and authentication
-- `distributors`: Supplier information
-- `coconut_intakes`: Raw material intake records
-- `sorting_records`: Sorting operation records
-- `employees`: Employee information
-- `job_rates`: Production rate information
-- `attendances`: Employee attendance records
-- `productions`: Production activity records
-- `pay_periods`: Payroll period definitions
-- `payroll_records`: Calculated payroll records
-- `reports`: Generated reports
+- `User`: User accounts and authentication
+- `Distributor`: Supplier information
+- `CoconutIntake`: Raw material intake records
+- `SortingRecord`: Sorting operation records
+- `Employee`: Employee information
+- `JobRate`: Production rate information
+- `Attendance`: Employee attendance records
+- `Production`: Production activity records
+- `PayPeriod`: Payroll period definitions
+- `PayrollRecord`: Calculated payroll records
+- `Report`: Generated reports
 
 ## Security
 

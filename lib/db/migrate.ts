@@ -1,10 +1,14 @@
-import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { db } from '@/lib/db';
+import { execSync } from 'child_process';
 
 async function runMigrations() {
-  console.log('Running migrations...');
-  await migrate(db, { migrationsFolder: './drizzle' });
-  console.log('Migrations complete!');
+  console.log('Running Prisma migrations...');
+  try {
+    execSync('npx prisma migrate deploy', { stdio: 'inherit' });
+    console.log('Migrations complete!');
+  } catch (error) {
+    console.error('Error running migrations:', error);
+    process.exit(1);
+  }
 }
 
 runMigrations()

@@ -1,4 +1,4 @@
-Berikut ringkasan **lengkap** (tapi tetap enak dipakai buat “vibe coding”) tentang **alur aplikasi** dan **fitur utama** untuk Smart Payroll + Manajemen Produksi dengan stack **Next.js + Tailwind + shadcn/ui + Prisma + Postgres + Docker**.
+Berikut ringkasan **lengkap** (tapi tetap enak dipakai buat "vibe coding") tentang **alur aplikasi** dan **fitur utama** untuk Smart Payroll + Manajemen Produksi dengan stack **Next.js + Tailwind + shadcn/ui + Prisma + Postgres**.
 
 ---
 

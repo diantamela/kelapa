@@ -1,13 +1,15 @@
-import { Pool } from 'pg';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import * as schema from './schema';
+import { PrismaClient } from '@prisma/client';
 
-// For production, use environment variables
-// Use DIRECT_URL for migrations, DATABASE_URL for application
-const connectionString = process.env.DIRECT_URL || process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/kelapa';
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
 
-const pool = new Pool({
-  connectionString,
-});
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log: ['query'],
+  });
 
-export const db = drizzle(pool, { schema });
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+export const db = prisma;

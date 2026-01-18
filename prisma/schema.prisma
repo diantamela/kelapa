@@ -1,0 +1,219 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  pegawai_rmp
+  pegawai_mp
+  staff_hr
+  manajer
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  late
+  early_leave
+}
+
+enum PayrollStatus {
+  draft
+  validated
+  final
+}
+
+enum ProductionType {
+  manual
+  machine
+  shaler
+}
+
+enum QualityGrade {
+  premium
+  standard
+  low
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      UserRole
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employee     Employee?
+  reports      Report[]
+  @@map("users")
+}
+
+model Distributor {
+  id           Int      @id @default(autoincrement())
+  name         String
+  contactPerson String?
+  phone        String?
+  address      String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  coconutIntakes CoconutIntake[]
+  @@map("distributors")
+}
+
+model CoconutIntake {
+  id            Int          @id @default(autoincrement())
+  intakeDate    DateTime     @db.Date
+  distributorId Int?
+  weight        Decimal      @db.Decimal(10, 2)
+  grade         QualityGrade
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  distributor     Distributor? @relation(fields: [distributorId], references: [id])
+  sortingRecords SortingRecord[]
+  @@map("coconut_intakes")
+}
+
+model SortingRecord {
+  id           Int      @id @default(autoincrement())
+  intakeId     Int
+  sortedDate   DateTime @db.Date
+  goodCoconuts Decimal? @db.Decimal(10, 2)
+  badCoconuts  Decimal? @db.Decimal(10, 2)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  intake CoconutIntake @relation(fields: [intakeId], references: [id])
+  @@map("sorting_records")
+}
+
+model Employee {
+  id             Int      @id @default(autoincrement())
+  userId         Int?     @unique
+  employeeCode   String   @unique
+  firstName      String
+  lastName       String?
+  position       String?
+  division       String?
+  employmentType String
+  hourlyRate     Decimal? @db.Decimal(10, 2)
+  dailyRate      Decimal? @db.Decimal(10, 2)
+  isActive       Boolean  @default(true)
+  hireDate       DateTime? @db.Date
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user         User?       @relation(fields: [userId], references: [id])
+  attendances  Attendance[]
+  productions  Production[]
+  payrollRecords PayrollRecord[]
+  @@map("employees")
+}
+
+model JobRate {
+  id          Int      @id @default(autoincrement())
+  jobType     String
+  unit        String
+  ratePerUnit Decimal  @db.Decimal(10, 2)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("job_rates")
+}
+
+model Attendance {
+  id            Int             @id @default(autoincrement())
+  employeeId    Int
+  date          DateTime        @db.Date
+  checkIn       DateTime?
+  checkOut      DateTime?
+  status        AttendanceStatus
+  hoursWorked   Decimal?        @db.Decimal(4, 2)
+  mealAllowance Boolean         @default(false)
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+  @@map("attendances")
+}
+
+model Production {
+  id             Int           @id @default(autoincrement())
+  productionDate DateTime      @db.Date
+  productionType ProductionType
+  employeeId     Int?
+  quantity       Decimal       @db.Decimal(10, 2)
+  unit           String
+  notes          String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  employee Employee? @relation(fields: [employeeId], references: [id])
+  @@map("productions")
+}
+
+model PayPeriod {
+  id         Int           @id @default(autoincrement())
+  periodName String
+  startDate  DateTime      @db.Date
+  endDate    DateTime      @db.Date
+  status     PayrollStatus @default(draft)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  payrollRecords PayrollRecord[]
+  @@map("pay_periods")
+}
+
+model PayrollRecord {
+  id             Int           @id @default(autoincrement())
+  payPeriodId    Int
+  employeeId     Int
+  employmentType String
+  daysWorked     Int?
+  dailyRate      Decimal?      @db.Decimal(10, 2)
+  dailySalary    Decimal?      @db.Decimal(10, 2)
+  totalProduction Decimal?     @db.Decimal(10, 2)
+  ratePerUnit    Decimal?      @db.Decimal(10, 2)
+  contractSalary Decimal?      @db.Decimal(10, 2)
+  mealAllowance  Decimal?      @db.Decimal(10, 2)
+  bonuses        Decimal       @default(0) @db.Decimal(10, 2)
+  deductions     Decimal       @default(0) @db.Decimal(10, 2)
+  grossSalary    Decimal?      @db.Decimal(10, 2)
+  netSalary      Decimal?      @db.Decimal(10, 2)
+  status         PayrollStatus
+  processedAt    DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  payPeriod PayPeriod @relation(fields: [payPeriodId], references: [id])
+  employee  Employee  @relation(fields: [employeeId], references: [id])
+  @@map("payroll_records")
+}
+
+model Report {
+  id         Int      @id @default(autoincrement())
+  reportType String
+  reportDate DateTime @db.Date
+  data       String
+  createdBy  Int?
+  createdAt  DateTime @default(now())
+
+  createdByUser User? @relation(fields: [createdBy], references: [id])
+  @@map("reports")
+}

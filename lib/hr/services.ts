@@ -1,17 +1,8 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { 
-  employees, 
-  attendances,
-  payPeriods,
-  payrollRecords,
-  users,
-  productions,
-  jobRates
-} from '@/lib/db/schema';
-import { eq, and, gte, lte, desc, sql } from 'drizzle-orm';
 import { requireAuth } from '@/lib/auth/middleware';
+import { AttendanceStatus, PayrollStatus } from '@prisma/client';
 
 export interface EmployeeInput {
   employeeCode: string;
@@ -30,7 +21,7 @@ export interface AttendanceInput {
   date: string;
   checkIn?: string;
   checkOut?: string;
-  status: string; // 'present', 'absent', 'late', 'early_leave'
+  status: AttendanceStatus; // present | absent | late | early_leave
   notes?: string;
 }
 
@@ -48,185 +39,169 @@ export interface ProcessPayrollParams {
 export async function getAllEmployees(filters?: { employmentType?: string; isActive?: boolean }) {
   await requireAuth(['staff_hr', 'manajer']);
   
-  let query = db
-    .select({
-      id: employees.id,
-      employeeCode: employees.employeeCode,
-      firstName: employees.firstName,
-      lastName: employees.lastName,
-      position: employees.position,
-      division: employees.division,
-      employmentType: employees.employmentType,
-      hourlyRate: employees.hourlyRate,
-      dailyRate: employees.dailyRate,
-      isActive: employees.isActive,
-      hireDate: employees.hireDate,
+  return db.employee.findMany({
+    select: {
+      id: true,
+      employeeCode: true,
+      firstName: true,
+      lastName: true,
+      position: true,
+      division: true,
+      employmentType: true,
+      hourlyRate: true,
+      dailyRate: true,
+      isActive: true,
+      hireDate: true,
       user: {
-        id: users.id,
-        name: users.name,
-        email: users.email,
-        role: users.role,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+        }
       },
-      createdAt: employees.createdAt,
-    })
-    .from(employees)
-    .leftJoin(users, eq(employees.userId, users.id));
-
-  if (filters) {
-    if (filters.employmentType) {
-      query = query.where(eq(employees.employmentType, filters.employmentType));
+      createdAt: true,
+    },
+    where: {
+      ...(filters?.employmentType && { employmentType: filters.employmentType }),
+      ...(typeof filters?.isActive !== 'undefined' && { isActive: filters.isActive }),
+    },
+    orderBy: {
+      createdAt: 'desc'
     }
-    if (typeof filters.isActive !== 'undefined') {
-      query = query.where(eq(employees.isActive, filters.isActive));
-    }
-  }
-
-  return await query.orderBy(desc(employees.createdAt));
+  });
 }
 
 export async function getEmployeeById(id: number) {
   await requireAuth(['staff_hr', 'manajer']);
   
-  const [employee] = await db
-    .select({
-      id: employees.id,
-      employeeCode: employees.employeeCode,
-      firstName: employees.firstName,
-      lastName: employees.lastName,
-      position: employees.position,
-      division: employees.division,
-      employmentType: employees.employmentType,
-      hourlyRate: employees.hourlyRate,
-      dailyRate: employees.dailyRate,
-      isActive: employees.isActive,
-      hireDate: employees.hireDate,
+  return db.employee.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      employeeCode: true,
+      firstName: true,
+      lastName: true,
+      position: true,
+      division: true,
+      employmentType: true,
+      hourlyRate: true,
+      dailyRate: true,
+      isActive: true,
+      hireDate: true,
       user: {
-        id: users.id,
-        name: users.name,
-        email: users.email,
-        role: users.role,
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+        }
       },
-      createdAt: employees.createdAt,
-      updatedAt: employees.updatedAt,
-    })
-    .from(employees)
-    .leftJoin(users, eq(employees.userId, users.id))
-    .where(eq(employees.id, id));
-  
-  return employee;
+      createdAt: true,
+      updatedAt: true,
+    }
+  });
 }
 
 export async function createEmployee(data: EmployeeInput) {
-  const user = await requireAuth(['staff_hr']);
+  await requireAuth(['staff_hr']);
   
-  const [result] = await db
-    .insert(employees)
-    .values({
+  return db.employee.create({
+    data: {
       ...data,
       isActive: true,
-    })
-    .returning();
-  
-  return result;
+    }
+  });
 }
 
 export async function updateEmployee(id: number, data: Partial<EmployeeInput>) {
   await requireAuth(['staff_hr']);
   
-  const [result] = await db
-    .update(employees)
-    .set({
+  return db.employee.update({
+    where: { id },
+    data: {
       ...data,
       updatedAt: new Date(),
-    })
-    .where(eq(employees.id, id))
-    .returning();
-  
-  return result;
+    }
+  });
 }
 
 // Attendance Services
-export async function getAllAttendances(filters?: { 
-  startDate?: string; 
-  endDate?: string; 
+export async function getAllAttendances(filters?: {
+  startDate?: string;
+  endDate?: string;
   employeeId?: number;
-  status?: string;
+  status?: AttendanceStatus;
 }) {
   await requireAuth(['staff_hr', 'manajer']);
   
-  let query = db
-    .select({
-      id: attendances.id,
-      date: attendances.date,
-      checkIn: attendances.checkIn,
-      checkOut: attendances.checkOut,
-      status: attendances.status,
-      hoursWorked: attendances.hoursWorked,
-      mealAllowance: attendances.mealAllowance,
-      notes: attendances.notes,
+  return db.attendance.findMany({
+    select: {
+      id: true,
+      date: true,
+      checkIn: true,
+      checkOut: true,
+      status: true,
+      hoursWorked: true,
+      mealAllowance: true,
+      notes: true,
       employee: {
-        id: employees.id,
-        firstName: employees.firstName,
-        lastName: employees.lastName,
-        employeeCode: employees.employeeCode,
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          employeeCode: true,
+        }
       },
-      createdAt: attendances.createdAt,
-    })
-    .from(attendances)
-    .leftJoin(employees, eq(attendances.employeeId, employees.id));
-
-  if (filters) {
-    if (filters.startDate && filters.endDate) {
-      query = query.where(
-        and(
-          gte(attendances.date, filters.startDate),
-          lte(attendances.date, filters.endDate)
-        )
-      );
+      createdAt: true,
+    },
+    where: {
+      ...(filters?.startDate && filters?.endDate && {
+        date: {
+          gte: filters.startDate,
+          lte: filters.endDate,
+        }
+      }),
+      ...(filters?.employeeId && { employeeId: filters.employeeId }),
+      ...(filters?.status && { status: filters.status }),
+    },
+    orderBy: {
+      date: 'desc'
     }
-    if (filters.employeeId) {
-      query = query.where(eq(attendances.employeeId, filters.employeeId));
-    }
-    if (filters.status) {
-      query = query.where(eq(attendances.status, filters.status));
-    }
-  }
-
-  return await query.orderBy(desc(attendances.date));
+  });
 }
 
 export async function getAttendanceById(id: number) {
   await requireAuth(['staff_hr', 'manajer']);
   
-  const [attendance] = await db
-    .select({
-      id: attendances.id,
-      date: attendances.date,
-      checkIn: attendances.checkIn,
-      checkOut: attendances.checkOut,
-      status: attendances.status,
-      hoursWorked: attendances.hoursWorked,
-      mealAllowance: attendances.mealAllowance,
-      notes: attendances.notes,
+  return db.attendance.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      date: true,
+      checkIn: true,
+      checkOut: true,
+      status: true,
+      hoursWorked: true,
+      mealAllowance: true,
+      notes: true,
       employee: {
-        id: employees.id,
-        firstName: employees.firstName,
-        lastName: employees.lastName,
-        employeeCode: employees.employeeCode,
-        position: employees.position,
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          employeeCode: true,
+          position: true,
+        }
       },
-      createdAt: attendances.createdAt,
-      updatedAt: attendances.updatedAt,
-    })
-    .from(attendances)
-    .leftJoin(employees, eq(attendances.employeeId, employees.id))
-    .where(eq(attendances.id, id));
-  
-  return attendance;
+      createdAt: true,
+      updatedAt: true,
+    }
+  });
 }
 
 export async function createAttendance(data: AttendanceInput) {
-  const user = await requireAuth(['staff_hr']);
+  await requireAuth(['staff_hr']);
   
   // Calculate hours worked if both checkIn and checkOut are provided
   let hoursWorked: string | undefined;
@@ -245,16 +220,13 @@ export async function createAttendance(data: AttendanceInput) {
     }
   }
   
-  const [result] = await db
-    .insert(attendances)
-    .values({
+  return db.attendance.create({
+    data: {
       ...data,
       hoursWorked,
       mealAllowance,
-    })
-    .returning();
-  
-  return result;
+    }
+  });
 }
 
 export async function updateAttendance(id: number, data: Partial<AttendanceInput>) {
@@ -265,8 +237,8 @@ export async function updateAttendance(id: number, data: Partial<AttendanceInput
   
   if (data.checkIn || data.checkOut) {
     const existing = await getAttendanceById(id);
-    const checkIn = data.checkIn || existing?.checkIn;
-    const checkOut = data.checkOut || existing?.checkOut;
+    const checkIn = data.checkIn || existing?.checkIn?.toString();
+    const checkOut = data.checkOut || existing?.checkOut?.toString();
     
     if (checkIn && checkOut) {
       const checkInTime = new Date(checkIn);
@@ -280,65 +252,54 @@ export async function updateAttendance(id: number, data: Partial<AttendanceInput
     }
   }
   
-  const [result] = await db
-    .update(attendances)
-    .set(updateData)
-    .where(eq(attendances.id, id))
-    .returning();
-  
-  return result;
+  return db.attendance.update({
+    where: { id },
+    data: updateData
+  });
 }
 
 // Pay Period Services
 export async function getAllPayPeriods() {
   await requireAuth(['staff_hr', 'manajer']);
   
-  return await db
-    .select()
-    .from(payPeriods)
-    .orderBy(desc(payPeriods.startDate));
+  return db.payPeriod.findMany({
+    orderBy: {
+      startDate: 'desc'
+    }
+  });
 }
 
 export async function getPayPeriodById(id: number) {
   await requireAuth(['staff_hr', 'manajer']);
   
-  const [payPeriod] = await db
-    .select()
-    .from(payPeriods)
-    .where(eq(payPeriods.id, id));
-  
-  return payPeriod;
+  return db.payPeriod.findUnique({
+    where: { id }
+  });
 }
 
 export async function createPayPeriod(data: PayPeriodInput) {
-  const user = await requireAuth(['staff_hr']);
+  await requireAuth(['staff_hr']);
   
-  const [result] = await db
-    .insert(payPeriods)
-    .values(data)
-    .returning();
-  
-  return result;
+  return db.payPeriod.create({
+    data
+  });
 }
 
 export async function updatePayPeriod(id: number, data: Partial<PayPeriodInput>) {
   await requireAuth(['staff_hr']);
   
-  const [result] = await db
-    .update(payPeriods)
-    .set({
+  return db.payPeriod.update({
+    where: { id },
+    data: {
       ...data,
       updatedAt: new Date(),
-    })
-    .where(eq(payPeriods.id, id))
-    .returning();
-  
-  return result;
+    }
+  });
 }
 
 // Payroll Processing Services
 export async function processPayroll(params: ProcessPayrollParams) {
-  const user = await requireAuth(['staff_hr']);
+  await requireAuth(['staff_hr']);
   
   // Get the pay period
   const payPeriod = await getPayPeriodById(params.payPeriodId);
@@ -347,10 +308,9 @@ export async function processPayroll(params: ProcessPayrollParams) {
   }
   
   // Get all active employees
-  const allEmployees = await db
-    .select()
-    .from(employees)
-    .where(eq(employees.isActive, true));
+  const allEmployees = await db.employee.findMany({
+    where: { isActive: true },
+  });
   
   // Process payroll for each employee
   for (const employee of allEmployees) {
@@ -364,26 +324,28 @@ export async function processPayroll(params: ProcessPayrollParams) {
   }
   
   // Update pay period status to validated
-  await db
-    .update(payPeriods)
-    .set({ status: 'validated', updatedAt: new Date() })
-    .where(eq(payPeriods.id, params.payPeriodId));
+  await db.payPeriod.update({
+    where: { id: params.payPeriodId },
+    data: {
+      status: PayrollStatus.validated,
+      updatedAt: new Date()
+    }
+  });
   
   return { success: true, message: 'Payroll processed successfully' };
 }
 
-async function processDailyWorkerPayroll(employee: typeof employees.$inferSelect, payPeriod: typeof payPeriods.$inferSelect) {
+async function processDailyWorkerPayroll(employee: any, payPeriod: any) {
   // Get attendance records for the period
-  const attendances = await db
-    .select()
-    .from(attendances)
-    .where(
-      and(
-        eq(attendances.employeeId, employee.id),
-        gte(attendances.date, payPeriod.startDate),
-        lte(attendances.date, payPeriod.endDate)
-      )
-    );
+  const attendances = await db.attendance.findMany({
+    where: {
+      employeeId: employee.id,
+      date: {
+        gte: payPeriod.startDate,
+        lte: payPeriod.endDate
+      }
+    }
+  });
   
   // Calculate days worked and total hours
   let daysWorked = 0;
@@ -400,12 +362,12 @@ async function processDailyWorkerPayroll(employee: typeof employees.$inferSelect
     }
     
     if (att.hoursWorked) {
-      totalHours += parseFloat(att.hoursWorked);
+      totalHours += Number(att.hoursWorked);
     }
   }
   
   // Calculate salary
-  const dailyRate = employee.dailyRate ? parseFloat(employee.dailyRate) : 0;
+  const dailyRate = employee.dailyRate ? Number(employee.dailyRate) : 0;
   const dailySalary = daysWorked * dailyRate;
   
   // Calculate meal allowance (assuming fixed amount per day)
@@ -418,34 +380,33 @@ async function processDailyWorkerPayroll(employee: typeof employees.$inferSelect
   const netSalary = grossSalary;
   
   // Insert payroll record
-  await db
-    .insert(payrollRecords)
-    .values({
+  await db.payrollRecord.create({
+    data: {
       payPeriodId: payPeriod.id,
       employeeId: employee.id,
       employmentType: employee.employmentType,
       daysWorked,
-      dailyRate: employee.dailyRate,
-      dailySalary: dailySalary.toString(),
-      mealAllowance: mealAllowanceAmount.toString(),
-      grossSalary: grossSalary.toString(),
-      netSalary: netSalary.toString(),
-      status: 'validated',
-    });
+      dailyRate: employee.dailyRate ?? undefined,
+      dailySalary,
+      mealAllowance: mealAllowanceAmount,
+      grossSalary,
+      netSalary,
+      status: PayrollStatus.validated,
+    }
+  });
 }
 
-async function processContractWorkerPayroll(employee: typeof employees.$inferSelect, payPeriod: typeof payPeriods.$inferSelect) {
+async function processContractWorkerPayroll(employee: any, payPeriod: any) {
   // Get production records for the period
-  const productions = await db
-    .select()
-    .from(productions)
-    .where(
-      and(
-        eq(productions.employeeId, employee.id),
-        gte(productions.productionDate, payPeriod.startDate),
-        lte(productions.productionDate, payPeriod.endDate)
-      )
-    );
+  const productions = await db.production.findMany({
+    where: {
+      employeeId: employee.id,
+      productionDate: {
+        gte: payPeriod.startDate,
+        lte: payPeriod.endDate
+      }
+    }
+  });
   
   // Group by production type and sum quantities
   const productionByType: Record<string, number> = {};
@@ -453,7 +414,7 @@ async function processContractWorkerPayroll(employee: typeof employees.$inferSel
     if (!productionByType[prod.productionType]) {
       productionByType[prod.productionType] = 0;
     }
-    productionByType[prod.productionType] += parseFloat(prod.quantity);
+    productionByType[prod.productionType] += Number(prod.quantity);
   }
   
   // Calculate salary based on job rates
@@ -464,19 +425,15 @@ async function processContractWorkerPayroll(employee: typeof employees.$inferSel
     totalProduction += quantity;
     
     // Get job rate for this production type
-    const jobRate = await db
-      .select()
-      .from(jobRates)
-      .where(
-        and(
-          eq(jobRates.jobType, prodType),
-          eq(jobRates.isActive, true)
-        )
-      )
-      .limit(1);
+    const jobRate = await db.jobRate.findFirst({
+      where: {
+        jobType: prodType,
+        isActive: true
+      }
+    });
     
-    if (jobRate.length > 0) {
-      const rate = parseFloat(jobRate[0].ratePerUnit);
+    if (jobRate) {
+      const rate = Number(jobRate.ratePerUnit);
       contractSalary += quantity * rate;
     }
   }
@@ -488,136 +445,130 @@ async function processContractWorkerPayroll(employee: typeof employees.$inferSel
   const netSalary = grossSalary;
   
   // Insert payroll record
-  await db
-    .insert(payrollRecords)
-    .values({
+  await db.payrollRecord.create({
+    data: {
       payPeriodId: payPeriod.id,
       employeeId: employee.id,
       employmentType: employee.employmentType,
-      totalProduction: totalProduction.toString(),
-      ratePerUnit: '', // Will be calculated per production type
-      contractSalary: contractSalary.toString(),
-      grossSalary: grossSalary.toString(),
-      netSalary: netSalary.toString(),
-      status: 'validated',
-    });
+      totalProduction,
+      // ratePerUnit intentionally left null since varies per type
+      contractSalary,
+      grossSalary,
+      netSalary,
+      status: PayrollStatus.validated,
+    }
+  });
 }
 
 // Payroll Records Services
-export async function getAllPayrollRecords(filters?: { payPeriodId?: number; employeeId?: number; status?: string }) {
+export async function getAllPayrollRecords(filters?: { payPeriodId?: number; employeeId?: number; status?: PayrollStatus }) {
   await requireAuth(['staff_hr', 'manajer']);
   
-  let query = db
-    .select({
-      id: payrollRecords.id,
+  return db.payrollRecord.findMany({
+    select: {
+      id: true,
       payPeriod: {
-        id: payPeriods.id,
-        periodName: payPeriods.periodName,
-        startDate: payPeriods.startDate,
-        endDate: payPeriods.endDate,
+        select: {
+          id: true,
+          periodName: true,
+          startDate: true,
+          endDate: true,
+        }
       },
       employee: {
-        id: employees.id,
-        firstName: employees.firstName,
-        lastName: employees.lastName,
-        employeeCode: employees.employeeCode,
-        employmentType: employees.employmentType,
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          employeeCode: true,
+          employmentType: true,
+        }
       },
-      employmentType: payrollRecords.employmentType,
-      daysWorked: payrollRecords.daysWorked,
-      dailyRate: payrollRecords.dailyRate,
-      dailySalary: payrollRecords.dailySalary,
-      totalProduction: payrollRecords.totalProduction,
-      ratePerUnit: payrollRecords.ratePerUnit,
-      contractSalary: payrollRecords.contractSalary,
-      mealAllowance: payrollRecords.mealAllowance,
-      bonuses: payrollRecords.bonuses,
-      deductions: payrollRecords.deductions,
-      grossSalary: payrollRecords.grossSalary,
-      netSalary: payrollRecords.netSalary,
-      status: payrollRecords.status,
-      processedAt: payrollRecords.processedAt,
-      createdAt: payrollRecords.createdAt,
-    })
-    .from(payrollRecords)
-    .leftJoin(payPeriods, eq(payrollRecords.payPeriodId, payPeriods.id))
-    .leftJoin(employees, eq(payrollRecords.employeeId, employees.id));
-
-  if (filters) {
-    if (filters.payPeriodId) {
-      query = query.where(eq(payrollRecords.payPeriodId, filters.payPeriodId));
-    }
-    if (filters.employeeId) {
-      query = query.where(eq(payrollRecords.employeeId, filters.employeeId));
-    }
-    if (filters.status) {
-      query = query.where(eq(payrollRecords.status, filters.status));
-    }
-  }
-
-  return await query.orderBy(desc(payrollRecords.createdAt));
+      employmentType: true,
+      daysWorked: true,
+      dailyRate: true,
+      dailySalary: true,
+      totalProduction: true,
+      ratePerUnit: true,
+      contractSalary: true,
+      mealAllowance: true,
+      bonuses: true,
+      deductions: true,
+      grossSalary: true,
+      netSalary: true,
+      status: true,
+      processedAt: true,
+      createdAt: true,
+    },
+    where: {
+      ...(filters?.payPeriodId && { payPeriodId: filters.payPeriodId }),
+      ...(filters?.employeeId && { employeeId: filters.employeeId }),
+      ...(filters?.status && { status: filters.status }),
+    },
+    orderBy: { createdAt: 'desc' }
+  });
 }
 
 export async function getPayrollRecordById(id: number) {
   await requireAuth(['staff_hr', 'manajer']);
   
-  const [payrollRecord] = await db
-    .select({
-      id: payrollRecords.id,
+  return db.payrollRecord.findUnique({
+    where: { id },
+    select: {
+      id: true,
       payPeriod: {
-        id: payPeriods.id,
-        periodName: payPeriods.periodName,
-        startDate: payPeriods.startDate,
-        endDate: payPeriods.endDate,
-        status: payPeriods.status,
+        select: {
+          id: true,
+          periodName: true,
+          startDate: true,
+          endDate: true,
+          status: true,
+        }
       },
       employee: {
-        id: employees.id,
-        firstName: employees.firstName,
-        lastName: employees.lastName,
-        employeeCode: employees.employeeCode,
-        employmentType: employees.employmentType,
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          employeeCode: true,
+          employmentType: true,
+        }
       },
-      employmentType: payrollRecords.employmentType,
-      daysWorked: payrollRecords.daysWorked,
-      dailyRate: payrollRecords.dailyRate,
-      dailySalary: payrollRecords.dailySalary,
-      totalProduction: payrollRecords.totalProduction,
-      ratePerUnit: payrollRecords.ratePerUnit,
-      contractSalary: payrollRecords.contractSalary,
-      mealAllowance: payrollRecords.mealAllowance,
-      bonuses: payrollRecords.bonuses,
-      deductions: payrollRecords.deductions,
-      grossSalary: payrollRecords.grossSalary,
-      netSalary: payrollRecords.netSalary,
-      status: payrollRecords.status,
-      processedAt: payrollRecords.processedAt,
-      createdAt: payrollRecords.createdAt,
-      updatedAt: payrollRecords.updatedAt,
-    })
-    .from(payrollRecords)
-    .leftJoin(payPeriods, eq(payrollRecords.payPeriodId, payPeriods.id))
-    .leftJoin(employees, eq(payrollRecords.employeeId, employees.id))
-    .where(eq(payrollRecords.id, id));
-  
-  return payrollRecord;
+      employmentType: true,
+      daysWorked: true,
+      dailyRate: true,
+      dailySalary: true,
+      totalProduction: true,
+      ratePerUnit: true,
+      contractSalary: true,
+      mealAllowance: true,
+      bonuses: true,
+      deductions: true,
+      grossSalary: true,
+      netSalary: true,
+      status: true,
+      processedAt: true,
+      createdAt: true,
+      updatedAt: true,
+    }
+  });
 }
 
 // Finalize Payroll
 export async function finalizePayroll(payPeriodId: number) {
-  const user = await requireAuth(['staff_hr']);
+  await requireAuth(['staff_hr']);
   
   // Update pay period status to final
-  await db
-    .update(payPeriods)
-    .set({ status: 'final', updatedAt: new Date() })
-    .where(eq(payPeriods.id, payPeriodId));
+  await db.payPeriod.update({
+    where: { id: payPeriodId },
+    data: { status: PayrollStatus.final, updatedAt: new Date() }
+  });
   
   // Update all payroll records in this period to final
-  await db
-    .update(payrollRecords)
-    .set({ status: 'final', processedAt: new Date(), updatedAt: new Date() })
-    .where(eq(payrollRecords.payPeriodId, payPeriodId));
+  await db.payrollRecord.updateMany({
+    where: { payPeriodId },
+    data: { status: PayrollStatus.final, processedAt: new Date(), updatedAt: new Date() }
+  });
   
   return { success: true, message: 'Payroll finalized successfully' };
 }
