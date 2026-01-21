@@ -1,15 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-require('dotenv').config();
+import dotenv from 'dotenv';
+dotenv.config();
 
 // Gunakan file langsung untuk seeding
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: 'file:./kelapa.db',
-    },
-  },
-});
+const prisma = new PrismaClient();
 
 async function seed() {
   try {
@@ -68,6 +63,42 @@ async function seed() {
     });
 
     console.log('Admin dibuat:', adminUser.name);
+
+    // Buat pengguna untuk Pegawai RMP
+    const rmpUser = await prisma.user.create({
+      data: {
+        name: 'Pegawai RMP',
+        email: 'rmp@example.com',
+        password: hashedPassword,
+        role: 'pegawai_rmp'
+      }
+    });
+
+    console.log('Pegawai RMP dibuat:', rmpUser.name);
+
+    // Buat pengguna untuk Pegawai MP
+    const mpUser = await prisma.user.create({
+      data: {
+        name: 'Pegawai MP',
+        email: 'mp@example.com',
+        password: hashedPassword,
+        role: 'pegawai_mp'
+      }
+    });
+
+    console.log('Pegawai MP dibuat:', mpUser.name);
+
+    // Buat pengguna untuk Staff HR
+    const hrUser = await prisma.user.create({
+      data: {
+        name: 'Staff HR',
+        email: 'hr@example.com',
+        password: hashedPassword,
+        role: 'hr'
+      }
+    });
+
+    console.log('Staff HR dibuat:', hrUser.name);
 
     // Buat karyawan
     const employee = await prisma.employee.create({
